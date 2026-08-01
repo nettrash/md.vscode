@@ -1371,7 +1371,14 @@ class Writer {
     if (!text.includes('\u{E000}')) return text;
     let out = text;
     for (let index = this.spans.latex.length - 1; index >= 0; index--) {
-      out = out.replaceAll(Writer.token(index), replacement(index));
+      const value = replacement(index);
+      // The replacement is passed as a **function**, and that is load-bearing
+      // rather than stylistic: a string replacement has `$&`, `` $` ``, `$'`
+      // and `$1` interpreted inside it, and the strings being put back here are
+      // LaTeX — `$a &= b$` is an ordinary formula and its `$&` would be
+      // rewritten to the token it was replacing. Swift's `ScalarText.replacing`
+      // is literal, so this is what "the same replacement" means in JavaScript.
+      out = out.replaceAll(Writer.token(index), () => value);
     }
     return out;
   }

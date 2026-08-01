@@ -105,7 +105,9 @@ describe('whitespace sets', () => {
   });
 
   // ==========================================================================
-  // KNOWN FAILURE — a real divergence in the frozen `src/render/text.ts`.
+  // This one caught a real divergence in `src/render/text.ts`, which now has
+  // the U+200B entry it was missing. Kept with its full reasoning, because the
+  // entry looks like a typo to anyone tidying the table and is not one.
   //
   // Swift's `testParserBlankLineSetIsFoundationsOwn` and Kotlin's
   // `MarkdownParser.kt` both put U+200B ZERO WIDTH SPACE *in* the general
@@ -120,17 +122,17 @@ describe('whitespace sets', () => {
   //    (`MarkdownHTML.swift` met the same fact from the other side and narrowed
   //    *its* trim to " \t".)"
   //
-  // `text.ts` omits U+200B and gives the CSV alignment scan as its reason — but
-  // that scan is precisely the *other* side of the same fact. It has its own
-  // narrower ASCII trim (`trimAsciiSpaceTab` in `html.ts`) exactly so that the
-  // general set can keep U+200B without misaligning a pasted spreadsheet. The
-  // two decisions are opposite on purpose (port spec §5, rules 5 and 7);
+  // `text.ts` had omitted U+200B and gave the CSV alignment scan as its reason
+  // — but that scan is precisely the *other* side of the same fact. It has its
+  // own narrower ASCII trim (`trimAsciiSpaceTab` in `html.ts`) exactly so that
+  // the general set can keep U+200B without misaligning a pasted spreadsheet.
+  // The two decisions are opposite on purpose (port spec §5, rules 5 and 7);
   // folding one into the other loses the blank line.
   //
-  // Left failing on purpose. The fix is one entry in `WHITESPACE`, but
-  // `text.ts` is frozen and shared, so it is not this suite's call to make.
+  // Settled by running it, not by reading tables: on this machine Foundation's
+  // `CharacterSet.whitespaces.contains(U+200B)` is `true`.
   // ==========================================================================
-  it('FAILS: U+200B is in Foundation’s whitespace set (port spec §5 rule 5)', () => {
+  it('U+200B is in Foundation’s whitespace set (port spec §5 rule 5)', () => {
     expect(isWhitespace(0x200b)).toBe(true);
     expect(trimWS(ZWSP)).toBe('');
   });

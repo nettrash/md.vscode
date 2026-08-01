@@ -41,19 +41,36 @@
  * `WhiteSpace ∪ LineTerminator`, which adds `\n \r \v \f     ﻿`
  * — wrong at both ends.
  *
- * Note the exclusions, each load-bearing:
- *   * **U+200B ZERO WIDTH SPACE** is not Zs. Including it would align the same
- *     pasted spreadsheet differently on two platforms over an invisible
- *     character (called out explicitly in `MarkdownHTML.delimitedTable`).
+ * **U+200B ZERO WIDTH SPACE is in the set**, and it is the one entry worth
+ * arguing about: it is the only character Apple's frozen tables and the JVM
+ * disagree about — `Zs` to Foundation, `Cf` to everyone current. Verified by
+ * running it rather than by reasoning about it: `CharacterSet.whitespaces`
+ * answers `true` for U+200B on this machine, and `MarkdownParser.swift`
+ * decides a blank line with `trimmingCharacters(in: .whitespaces).isEmpty`.
+ * Drop it and a line holding one invisible ZWSP is a block separator on iOS,
+ * macOS and Android and a paragraph continuation here — the same document
+ * being two paragraphs everywhere else and one in VS Code.
+ *
+ * The pasted-spreadsheet hazard is real, but it belongs to a different trim.
+ * `MarkdownHTML.delimitedTable` met this same fact from the far side and
+ * narrowed *its own* cell trim to `" \t"` — `trimAsciiSpaceTab` in `html.ts` —
+ * exactly so that this set could keep U+200B without `U+200B 1 U+200B`
+ * counting as a number. The two decisions are opposite on purpose; folding one
+ * into the other loses the blank line and fixes nothing.
+ *
+ * The genuine exclusions, each load-bearing:
  *   * U+180E MONGOLIAN VOWEL SEPARATOR has been `Cf`, not `Zs`, since
- *     Unicode 6.3.
+ *     Unicode 6.3, and Foundation agrees — it is not in the set.
  *   * U+000A/U+000D/U+000B/U+000C/U+0085/U+2028/U+2029 are newlines, not
- *     spaces — they belong to `WHITESPACE_AND_NEWLINES` only.
+ *     spaces — they belong to `WHITESPACE_AND_NEWLINES` only. U+0085 NEL in
+ *     particular is whitespace to the note-body trim and not to blank-line
+ *     detection.
  */
 const WHITESPACE = new Set([
   0x0009, 0x0020, 0x00a0, 0x1680,
   0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005,
   0x2006, 0x2007, 0x2008, 0x2009, 0x200a,
+  0x200b,
   0x202f, 0x205f, 0x3000,
 ]);
 

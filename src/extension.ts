@@ -50,7 +50,7 @@ import {
   exportPdf,
   exportSvg,
   showDiagramPreview,
-} from './export/commands';
+} from './export/index';
 import { richDirectory } from './preview/assets';
 import { affectsPreview, readConfig } from './preview/config';
 import { extendMarkdownIt } from './preview/markdownItHook';

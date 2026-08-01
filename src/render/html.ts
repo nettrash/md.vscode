@@ -160,12 +160,25 @@ export function renderDocument(source: string, opts: RenderOptions): string {
     ].join('\n');
   }
   if (needs.mermaid) head += `\n<script src="${base}/mermaid.min.js"></script>`;
-  // Viz.js is Graphviz. PlantUML needs it for its own Graphviz-backed layouts
-  // (class, activity, …), and a ```dot block is that same engine addressed
-  // directly — so the two share one script include, and a ```dot block adds
-  // zero payload over what PlantUML already needed. PlantUML itself is never
-  // included here: md-init.js `import()`s it lazily when a `.plantuml` element
-  // exists.
+  // Viz.js is Graphviz, and a ```dot block is that engine addressed directly.
+  //
+  // The `needs.plantuml` half of this condition is inherited from md, whose
+  // comment explains it as "PlantUML needs Viz for its own Graphviz-backed
+  // layouts (class, activity, …)". **That explanation does not survive
+  // testing.** Loading plantuml.js in Node with no `Viz` global in scope at
+  // all still renders sequence, class and activity diagrams correctly — this
+  // TeaVM build carries PlantUML's own pure-Java *Smetana* layout engine
+  // (14 references to it in the bundle) and never reaches for Viz.
+  //
+  // The include is kept anyway, deliberately, on two grounds: it is what the
+  // three shipping apps emit, and this function's no-hook output is
+  // byte-compared against `MarkdownHTML.document`, so dropping it would fail
+  // the parity gate for a saving that only shows up in a standalone HTML
+  // export that also contains PlantUML. Revisit it in all four ports together
+  // or not at all.
+  //
+  // PlantUML itself is never included here: the preview `import()`s it lazily
+  // when a `.plantuml` element exists.
   if (needs.plantuml || needs.graphviz) head += `\n<script src="${base}/viz-global.js"></script>`;
   // highlight.js shares no global with KaTeX, so it only has to have defined
   // `hljs` before the deferred md-init.js module runs: `defer` puts it in the
