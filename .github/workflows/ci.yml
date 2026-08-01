@@ -34,14 +34,28 @@ jobs:
           # failure would surface in a user's editor rather than here.
           node-version: '20'
 
-      - name: Show toolchain
+      - name: Show runtime
         run: |
           node --version
           npm --version
-          npx tsc --version
 
       - name: Install
         run: npm ci
+
+      - name: Show toolchain
+        # Deliberately AFTER `npm ci`, and via `npm exec --no`.
+        #
+        # `npx tsc --version` before the install does not print TypeScript's
+        # version: with nothing installed, npx resolves `tsc` from the registry,
+        # where it is an unrelated abandoned package that prints "This is not the
+        # tsc command you are looking for" and exits 1. Under `bash -e` that
+        # fails the whole job — which is exactly how this workflow first broke.
+        # `--no` forbids the install-on-miss behaviour outright, so if a tool is
+        # ever missing from devDependencies this step says so instead of
+        # silently running a stranger's package off the network.
+        run: |
+          npm exec --no -- tsc --version
+          npm exec --no -- vsce --version
 
       - name: Type-check
         run: npm run typecheck
@@ -57,9 +71,14 @@ jobs:
         # a mistake in .vscodeignore — the whole of `media/rich/` dropped,
         # or `node_modules` swept in — shows up in the log as a list rather
         # than as an extension that installs and cannot find its engines.
+        #
+        # `npm exec --no` for the same reason as the toolchain step above: it
+        # refuses to reach the registry, so a tool missing from
+        # devDependencies fails loudly here instead of running whatever
+        # happens to own that name on npm.
         run: |
-          npx vsce ls
-          npx vsce package
+          npm exec --no -- vsce ls
+          npm exec --no -- vsce package
 
       - name: Upload the packaged extension
         # The siblings upload artifacts only `if: failure()`, because there
