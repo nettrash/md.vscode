@@ -178,23 +178,23 @@
             "editor"
           ],
           "enumDescriptions": [
-            "md's own typewriter palette — fresh paper in a light theme, carbon paper in a dark one. Matches the iOS, macOS and Android apps.",
-            "Follow the colours of the current VS Code colour theme."
+            "md's own typewriter look — fresh paper in a light theme, carbon paper in a dark one, set in American Typewriter with Courier New for code. Matches the iOS, macOS and Android apps.",
+            "Look like the rest of VS Code: the colours of the current colour theme, and the fonts, size and line height of the built-in Markdown preview, including your markdown.preview.fontFamily, fontSize and lineHeight."
           ],
-          "default": "paper",
-          "description": "Which palette the preview draws in.",
+          "default": "editor",
+          "description": "Which colours and fonts the preview draws in.",
           "scope": "resource"
         },
         "md.preview.bodyFont": {
           "type": "string",
-          "default": "\"American Typewriter\", Georgia, \"Times New Roman\", serif",
-          "markdownDescription": "Font stack for preview prose. The default names American Typewriter first — the apps' face, present on macOS — then falls back to Georgia, which is what the Android app uses where American Typewriter does not exist.",
+          "default": "",
+          "markdownDescription": "Font stack for preview prose. Leave empty to follow `#md.preview.theme#` — the built-in preview's own face in the editor theme, American Typewriter (falling back to Georgia, as the Android app does) in the paper theme.",
           "scope": "resource"
         },
         "md.preview.codeFont": {
           "type": "string",
-          "default": "\"Courier New\", ui-monospace, monospace",
-          "description": "Font stack for code blocks and inline code in the preview.",
+          "default": "",
+          "markdownDescription": "Font stack for code blocks and inline code in the preview. Leave empty to follow `#md.preview.theme#` — your `#editor.fontFamily#` in the editor theme, Courier New in the paper theme.",
           "scope": "resource"
         },
         "md.math.enabled": {
@@ -256,8 +256,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "package": "npm run typecheck && npm run test && npm run compile && vsce package",
-    "vscode:prepublish": "npm run compile"
+    "package": "npm run typecheck && npm run test && npm run compile && node scripts/package.mjs",
+    "vscode:prepublish": "node scripts/prepublish.mjs"
   },
   "devDependencies": {
     "@types/markdown-it": "^14.1.2",

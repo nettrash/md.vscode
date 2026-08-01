@@ -53,46 +53,87 @@
       a tie is decided by load order — which point 1 says we do not control. The
       frame is set with `padding` only, which is what md uses anyway.
 
-   ── THE TWO PALETTES ────────────────────────────────────────────────────────
+   ── THE TWO MODES ───────────────────────────────────────────────────────────
 
-   Default (`md.preview.theme: "paper"`): md's own typewriter palette, the one
-   the iOS, macOS and Android apps draw — fresh paper in a light theme, carbon
-   paper in a dark one. Colours are the app's literal hex, so a screenshot of
-   the preview and a screenshot of the app show the same page.
+   Default (`md.preview.theme: "editor"`): the preview dresses as the rest of
+   the editor. Every palette variable is remapped onto a `--vscode-*` colour,
+   and — this is the part the setting used to skip — so are the two font
+   variables and the body's size and leading, onto the very custom properties
+   VS Code's own preview reads. A reader who has set
+   `markdown.preview.fontFamily`, `fontSize` or `lineHeight` gets those here
+   too, for free and without md reading another extension's settings. The
+   intent is that in this mode our preview is indistinguishable from the
+   built-in one apart from what it can additionally draw.
 
-   `body[data-md-theme="editor"]` (`md.preview.theme: "editor"`): the same rules,
-   with the seven palette variables remapped onto `--vscode-*`, so the preview
-   follows whatever colour theme the editor is wearing. It changes **colours
-   only** — the fonts and the metrics stay md's, because that is what the
-   setting says it does and because the document's scale is a parity property.
+   Opt-in (`md.preview.theme: "paper"`): md's own typewriter look, the one the
+   iOS, macOS and Android apps draw — fresh paper in a light theme, carbon
+   paper in a dark one, set in American Typewriter with Courier New for code.
+   Colours are the apps' literal hex, so a screenshot of the preview and a
+   screenshot of the app show the same page.
 
-   The extension stamps `data-md-theme` on <body> from the setting; when it is
-   absent the paper palette applies, so a preview that renders before any script
-   runs is already correct.
+   Light versus dark is a *separate question* from which mode is selected, and
+   it is answered the same way in both: by the `vscode-light` / `vscode-dark` /
+   `vscode-high-contrast[-light]` classes VS Code puts on <body>. Paper mode
+   uses them to pick fresh paper or carbon; editor mode uses them only for
+   `color-scheme`, because the `--vscode-*` colours have already done the work.
+
+   ── WHERE THE MODE SWITCH LIVES, AND WHY IT IS NOT ON <body> ────────────────
+
+   On the wrapper: `<div class="md-preview-root" data-md-theme="…">`, which the
+   extension emits around the document. It is not on <body> because we cannot
+   put it there — an extension contributing `markdown.previewStyles` and a
+   markdown-it hook has a stylesheet and some markup, and no handle on that
+   element at all. This sheet used to key the editor palette off
+   `body[data-md-theme="editor"]`, a selector nothing on earth could match, and
+   the setting silently did nothing for it.
+
+   Custom properties inherit, so declaring the palette on the wrapper reaches
+   every block we emit. It does not reach <body>, which is *above* the wrapper —
+   hence the second, `:has()`-based rule in §1 for the page frame. When the
+   attribute is absent the paper values stand, so a preview rendered before any
+   of our markup arrives is still a coherent page rather than a half-painted one.
 
    ── FONTS ───────────────────────────────────────────────────────────────────
 
-   `--md-body-font` and `--md-code-font` carry the `md.preview.bodyFont` /
-   `md.preview.codeFont` settings. They are declared on `:root` so the extension
-   may set them at runtime on either the root element or <body>: a declaration
-   on a descendant always beats one inherited from an ancestor, and an inline
-   style beats this rule on the same element.
+   `--md-body-font` and `--md-code-font` hold whichever face the mode calls for,
+   and the mode rules in §1 are where those defaults live. The `md.preview.
+   bodyFont` / `codeFont` settings default to the empty string, meaning "follow
+   the theme", and the extension then emits **no** inline custom property at all.
 
-   American Typewriter — the apps' prose face, and the first name in the default
-   stack — exists only on Apple platforms. The app's own fallback is
+   That last point is load-bearing rather than tidiness. An inline
+   `style="--md-body-font:…"` on the wrapper is a declaration on the very
+   element the mode rules target, and an inline declaration beats any rule
+   whatever its specificity — so a font stack emitted unconditionally would pin
+   American Typewriter over the top of editor mode for ever, and no amount of
+   CSS here could undo it. The setting is emitted only when the reader has
+   actually set one, which is also the only time overriding the theme is what
+   they asked for.
+
+   American Typewriter — the apps' prose face, and the first name in paper
+   mode's stack — exists only on Apple platforms. The app's own fallback is
    `"Courier New", serif`, which means the entire document, prose included, sets
    in Courier New on Windows. The Android app faced the same question and
-   answered it with `Georgia, "Times New Roman", serif`; the default in
-   package.json follows Android there, so a Mac shows the app's face and
-   everywhere else shows Android's. Do not add a webfont: the only faces this
-   product embeds anywhere are KaTeX's twenty OFL-licensed `KaTeX_*` files. */
+   answered it with `Georgia, "Times New Roman", serif`; paper mode follows
+   Android there, so a Mac shows the app's face and everywhere else shows
+   Android's. Do not add a webfont: the only faces this product embeds anywhere
+   are KaTeX's twenty OFL-licensed `KaTeX_*` files. */
 
 /* ══ 1. Palette and fonts ═══════════════════════════════════════════════════ */
 
+/* Paper mode's own values, which are also the base every mode rule below
+   overrides. They sit on `:root` rather than on the wrapper so that <body> —
+   the page frame, which no rule of ours can reach from the wrapper — inherits
+   them without a second selector. */
 :root {
-	/* Overridable at runtime; see the note above. */
 	--md-body-font: "American Typewriter", Georgia, "Times New Roman", serif;
 	--md-code-font: "Courier New", ui-monospace, monospace;
+
+	/* md's preview body size and leading. `13pt` is the sheet's only absolute
+	   metric; everything below is em-based and scales off it, which is why
+	   these are variables at all — editor mode has to be able to hand the
+	   whole document over to VS Code's scale in one place. */
+	--md-body-size: 13pt;
+	--md-body-leading: 1.55;
 
 	/* md's light palette — "fresh paper". Four of these come from the app's
 	   asset catalog (PaperBackground, PaperInk, PaperBackgroundSecondary,
@@ -125,26 +166,94 @@ body.vscode-high-contrast:not(.vscode-high-contrast-light) {
 	--md-code-string: #CDBF9E;
 }
 
-/* Follow the editor's colour theme. Same specificity (0,1,1) as the carbon-paper
-   rule above, so this must stay *after* it: a dark VS Code theme matches both. */
-body[data-md-theme="editor"] {
-	--md-paper: var(--vscode-editor-background);
-	--md-ink: var(--vscode-editor-foreground, var(--vscode-foreground));
-	--md-secondary: var(--vscode-textCodeBlock-background);
-	--md-accent: var(--vscode-textLink-foreground);
-	--md-muted: var(--vscode-descriptionForeground);
+/* ── Editor mode ─────────────────────────────────────────────────────────────
+
+   The values themselves, named once. Two rules select editor mode — one for
+   the document, one for the page frame — and they must not be able to
+   disagree, nor repeat these fallback stacks, which are quoted verbatim from
+   VS Code 1.131.0's own preview stylesheets and are not ours to paraphrase.
+   Declaring them costs nothing: a custom property nobody references is never
+   resolved.
+
+   `--markdown-font-family`, `--markdown-font-size` and `--markdown-line-height`
+   are injected into the preview by VS Code from the reader's
+   `markdown.preview.fontFamily` / `fontSize` / `lineHeight`; consuming them,
+   fallbacks and all, is the whole of "follow the editor's fonts". Do not read
+   those three settings in the extension host instead — they belong to another
+   extension, they change without notifying ours, and the variable is already
+   on the element. */
+:root {
+	--md-editor-paper: var(--vscode-editor-background);
+	--md-editor-ink: var(--vscode-editor-foreground, var(--vscode-foreground));
+	--md-editor-secondary: var(--vscode-textCodeBlock-background);
+	--md-editor-accent: var(--vscode-textLink-foreground);
+	--md-editor-muted: var(--vscode-descriptionForeground);
 	/* --vscode-widget-border is undefined in a good many themes, hence the
 	   ladder down to the neutral markdown.css uses for its front-matter table. */
-	--md-border: var(--vscode-widget-border, var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.35)));
+	--md-editor-border: var(--vscode-widget-border, var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.35)));
+	--md-editor-body-font: var(--markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, "Ubuntu", "Droid Sans", sans-serif);
+	--md-editor-code-font: var(--vscode-editor-font-family, "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace);
+	--md-editor-body-size: var(--markdown-font-size, 14px);
+	--md-editor-body-leading: var(--markdown-line-height, 22px);
+}
+
+/* Editor mode, part 1: the document.
+
+   Keyed on the wrapper, which is the only element we own — see the note on the
+   mode switch above. A value declared here beats one inherited from <body>
+   whatever the specificity of the rule that set it there, so this rule needs no
+   help from source order to clear the carbon-paper rule above. */
+.md-preview-root[data-md-theme="editor"] {
+	--md-paper: var(--md-editor-paper);
+	--md-ink: var(--md-editor-ink);
+	--md-secondary: var(--md-editor-secondary);
+	--md-accent: var(--md-editor-accent);
+	--md-muted: var(--md-editor-muted);
+	--md-border: var(--md-editor-border);
+	--md-body-font: var(--md-editor-body-font);
+	--md-code-font: var(--md-editor-code-font);
+	--md-body-size: var(--md-editor-body-size);
+	--md-body-leading: var(--md-editor-body-leading);
 	/* No --md-code-string: in this mode the hljs rules below deliberately do not
 	   apply and VS Code's own highlight.css colours the tokens. */
 }
 
-/* High contrast, either polarity and either palette — hence last and unqualified
-   by the theme attribute. HC themes promise a visible edge on every box; a 16 %
-   ink wash does not deliver one, and a table whose grid has vanished is worse
-   than a table that looks unlike the app. */
-body.vscode-high-contrast {
+/* Editor mode, part 2: the page frame.
+
+   <body> is an ancestor of the wrapper and inheritance only travels downwards,
+   so part 1 cannot reach it. Leaving it out is not an option: the frame is
+   what paints below the last line, and fresh paper under an editor-coloured
+   document reads as a rendering fault rather than as either look.
+
+   `:has()` is the only way to ask "is this preview in editor mode?" from a
+   selector on <body>. It is a rule of its own, and not a second selector on
+   part 1, because one unsupported selector invalidates the whole rule it
+   appears in — and part 1 is the rule that must survive that. (Chromium has
+   supported `:has()` since 105; VS Code 1.95, our engine floor, ships 128, and
+   the browsers that can run vscode.dev today all have it.)
+
+   Only the five variables the frame itself consumes are restated. --md-border
+   is deliberately not among them, so the high-contrast rule below still has
+   the last word on <body> despite being the less specific of the two. */
+body:has(.md-preview-root[data-md-theme="editor"]) {
+	--md-paper: var(--md-editor-paper);
+	--md-ink: var(--md-editor-ink);
+	--md-body-font: var(--md-editor-body-font);
+	--md-body-size: var(--md-editor-body-size);
+	--md-body-leading: var(--md-editor-body-leading);
+}
+
+/* High contrast, either polarity and either mode — hence last and qualified by
+   neither. HC themes promise a visible edge on every box; a 16 % ink wash does
+   not deliver one, and a table whose grid has vanished is worse than a table
+   that looks unlike the app.
+
+   The second selector is what keeps this true in editor mode: that mode's rule
+   declares --md-border *on the wrapper*, and a declared value always beats an
+   inherited one, so a rule on <body> alone would no longer be seen inside the
+   document. At (0,2,1) it also outranks the wrapper rule's (0,2,0). */
+body.vscode-high-contrast,
+body.vscode-high-contrast .md-preview-root {
 	--md-border: var(--vscode-contrastBorder, var(--md-ink));
 }
 
@@ -152,17 +261,24 @@ body.vscode-high-contrast {
 
 /* markdown.css sets font, size, line-height and `padding: 0 26px` on
    `html, body` at (0,0,1), and `padding-top: 1em` on `body`; this replaces all
-   of it. `13pt` is md's preview body size and the sheet's only absolute one —
-   everything below is em-based and scales off it, which is why
-   `markdown.preview.fontSize` is deliberately not consulted: it would rescale
-   the document away from the apps. A reader who wants a different size can say
-   so in `markdown.styles`, which loads after every previewStyle. */
+   of it — with, in editor mode, the same values it would have used, because
+   --md-body-size and --md-body-leading resolve to `--markdown-font-size` and
+   `--markdown-line-height` there. In paper mode they are md's own 13pt / 1.55,
+   and `markdown.preview.fontSize` is then deliberately *not* consulted: it
+   would rescale the document away from the apps, which is the one thing paper
+   mode exists to prevent. A reader who wants a third answer can still give one
+   in `markdown.styles`, which loads after every previewStyle.
+
+   The padding is md's in both modes and does not follow the built-in preview's
+   `0 26px`. It is layout rather than typography, the preview pane is routinely
+   a third of a window wide, and a reading measure that holds up at that width
+   is worth more than matching a number. */
 body.vscode-body {
 	background: var(--md-paper);
 	color: var(--md-ink);
 	font-family: var(--md-body-font);
-	font-size: 13pt;
-	line-height: 1.55;
+	font-size: var(--md-body-size);
+	line-height: var(--md-body-leading);
 	padding: 48px 56px;
 	-webkit-text-size-adjust: 100%;
 	color-scheme: light;
@@ -189,6 +305,26 @@ body.vscode-high-contrast:not(.vscode-high-contrast-light) {
 	body.vscode-body {
 		padding: 28px 24px;
 	}
+}
+
+/* The document's own face, restated on the wrapper. This is not redundant with
+   the frame rule above, and removing it silently breaks a setting.
+
+   `--md-body-font` may carry an inline override from `md.preview.bodyFont`,
+   and an inline custom property applies to the element that bears it and to
+   its descendants only. <body> is the wrapper's *ancestor*, so it resolves
+   `var(--md-body-font)` from the mode default and hands that down as an
+   inherited `font-family` — an inherited value the wrapper has no declaration
+   of its own to beat. Measured in Chrome before this rule existed: setting
+   `md.preview.bodyFont` changed the code face (that rule matches inside the
+   wrapper) and left the prose in the theme's face. Code needs no equivalent
+   line, for exactly that reason.
+
+   Nothing sets font-size or line-height here to match: those have no inline
+   path — there is no setting for them — so the frame's value is already the
+   document's. */
+body .md-preview-root {
+	font-family: var(--md-body-font);
 }
 
 /* md's `* { box-sizing: border-box }`, stopped at our container so it cannot
@@ -390,53 +526,61 @@ body .markdown-body pre code {
    highlight.js/styles/: every one of them sets `.hljs { background; color }`
    and destroys the paper look.
 
-   Scoped away from the editor palette, where VS Code's own highlight.css —
-   which follows the colour theme's token colours — is exactly what the reader
-   asked for. The `:not()` also lifts these to (0,3,1), clearing highlight.css's
-   `.vscode-light .hljs-keyword` at (0,2,0) whichever of us loads first.
+   PAPER MODE ONLY, and the absence of any `.hljs-*` rule in editor mode is a
+   decision rather than an oversight — please do not "restore" it. The built-in
+   preview loads its own highlight.css, a VS2015 palette with `.vscode-light`
+   overrides, which already colours these very classes to suit the active
+   colour theme. In editor mode that sheet is the right answer and ours would
+   only be a second opinion fighting it over load order.
+
+   The `:not()` costs nothing and lifts these to (0,3,1), which clears
+   highlight.css's `.vscode-light .hljs-keyword` at (0,2,0) whichever of us
+   loads first. It is written as a negation rather than as `[…="paper"]` so
+   that markup arriving without the attribute still gets the paper colours,
+   matching the fallback the rest of the sheet promises.
 
    Unlike the apps, the tokens are already in the markup: highlight.js runs in
    the extension host, so there is no live-DOM pass here and no flash of plain
    code before it lands. */
-body:not([data-md-theme="editor"]) .markdown-body .hljs-keyword,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-selector-tag,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-built_in,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-literal,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-type,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-title,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-section,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-name,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-doctag {
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-keyword,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-selector-tag,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-built_in,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-literal,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-type,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-title,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-section,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-name,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-doctag {
 	color: var(--md-accent);
 }
 
-body:not([data-md-theme="editor"]) .markdown-body .hljs-comment,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-quote,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-meta {
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-comment,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-quote,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-meta {
 	color: var(--md-muted);
 	font-style: italic;
 }
 
-body:not([data-md-theme="editor"]) .markdown-body .hljs-string,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-regexp,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-symbol,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-char,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-attr,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-attribute,
-body:not([data-md-theme="editor"]) .markdown-body .hljs-addition {
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-string,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-regexp,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-symbol,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-char,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-attr,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-attribute,
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-addition {
 	color: var(--md-code-string);
 }
 
-body:not([data-md-theme="editor"]) .markdown-body .hljs-deletion {
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-deletion {
 	color: var(--md-muted);
 	text-decoration: line-through;
 }
 
-body:not([data-md-theme="editor"]) .markdown-body .hljs-emphasis {
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-emphasis {
 	font-style: italic;
 }
 
-body:not([data-md-theme="editor"]) .markdown-body .hljs-strong {
+body .md-preview-root:not([data-md-theme="editor"]) .hljs-strong {
 	font-weight: bold;
 }
 
@@ -477,10 +621,14 @@ body .markdown-body .graphviz svg {
 /* Mermaid and PlantUML are not restyled here, and that is a decision rather
    than an omission. Mermaid writes its own theme stylesheet into every SVG it
    draws, and PlantUML takes a `dark` flag into the engine; both read the
-   palette from `data-md-dark` on <body>, which the preview script sets. A CSS
-   colour rule over their output would fight a stylesheet we do not own and
-   would differ from the apps. Graphviz is the exception, immediately below,
-   and only because it draws in plain black. */
+   palette from the light/dark state the preview script derives from VS Code's
+   own body classes. A CSS colour rule over their output would fight a
+   stylesheet we do not own and would differ from the apps. That holds in
+   editor mode too: neither engine offers a hook finer than light-or-dark, so
+   following the editor's polarity is the closest either can come to following
+   its theme, and inventing an approximation in CSS would be worse than the
+   honest limit. Graphviz is the exception, immediately below, and only because
+   it draws in plain black. */
 
 /* Graphviz draws in plain black on a transparent ground (the engine is asked
    for `bgcolor=transparent`, and for nothing else). It is recoloured to the
@@ -489,7 +637,10 @@ body .markdown-body .graphviz svg {
    engine's own attributes alone keeps the layout metrics — and so the label
    positions it computed — exactly as Graphviz intended. A `fontname` or a
    colour handed to the engine would change the metrics it lays the graph out
-   with, and the typewriter face does not exist on every platform anyway.
+   with, and the typewriter face does not exist on every platform anyway. That
+   is doubly true now that the ink is the editor's: a theme switch must move a
+   colour and nothing else, and passing anything to the engine would relay the
+   graph on every change of theme.
 
    An author's own `fontcolor` / `color` survives: Graphviz writes those out as
    attributes too, so each rule is scoped to the value the engine emits when
@@ -511,7 +662,10 @@ body .markdown-body .graphviz svg [fill="black"]:not(text) { fill: var(--md-ink)
    `.md-mathd .katex-display` clears KaTeX's own `.katex-display { margin: 1em 0 }`,
    which would otherwise stack on top of the container's 0.9em bottom margin.
    `overflow-y: hidden` stops a stray vertical scrollbar on tall fractions.
-   The formula itself needs no colour rule: KaTeX inherits the page's ink. */
+   The formula itself needs no colour rule: KaTeX inherits the page's ink, in
+   whichever mode, and so follows the editor's foreground for free. Its faces
+   stay KaTeX's in both modes — a formula set in the editor's UI font has the
+   wrong glyph metrics just as surely as one set in the prose face. */
 body .markdown-body .md-mathd .katex-display {
 	margin: 0;
 }

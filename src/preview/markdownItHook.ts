@@ -206,6 +206,13 @@ function previewBody(source: string, env: any): string {
     // stay behind this flag because they are VS Code-only and must never
     // appear in the bytes the parity tests diff.
     sourceLines: true,
+    // Each Mermaid and PlantUML block carries its own source in `data-md-src`.
+    // The preview is patched in place rather than reloaded, so the client
+    // cannot trust what it finds inside a diagram container: a morph can leave
+    // a stale `<svg>` there with the client's own marker stripped off, and an
+    // engine handed that draws a syntax error instead of a diagram. Same gate
+    // as `sourceLines` — additive, VS Code-only, never in the parity bytes.
+    diagramSources: true,
     engines: engineHooks(config),
   });
 

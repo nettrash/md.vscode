@@ -810,6 +810,107 @@ describe('source lines', () => {
   });
 });
 
+// MARK: - Diagram sources (VS Code only, strictly additive)
+
+describe('diagram sources', () => {
+  /** What `md-preview.ts` does with the attribute, so the round trip is real. */
+  function decodeAttribute(html: string, at = 0): string {
+    const marker = ' data-md-src="';
+    const start = html.indexOf(marker, at);
+    expect(start).toBeGreaterThanOrEqual(0);
+    const from = start + marker.length;
+    const encoded = html.slice(from, html.indexOf('"', from));
+    return Buffer.from(encoded, 'base64').toString('utf8');
+  }
+
+  it('carries a Mermaid block source verbatim, base64-encoded', () => {
+    // The arrows are the point: `-->` is escaped in the container's own text,
+    // and what the client needs is the source the author wrote, not the markup.
+    const source = doc('```mermaid', 'graph TD', '  A[a] --> B{b & "c"}', '```');
+    const html = body(source, { diagramSources: true });
+    expect(decodeAttribute(html)).toBe('graph TD\n  A[a] --> B{b & "c"}');
+  });
+
+  it('survives a non-ASCII diagram', () => {
+    // `atob` is bytes, not text. Encoding UTF-16 code units instead of UTF-8
+    // bytes would corrupt every one of these on the way back.
+    const source = doc('```mermaid', 'graph TD', '  A[Ünicode → 日本語]', '```');
+    expect(decodeAttribute(body(source, { diagramSources: true }))).toBe(
+      'graph TD\n  A[Ünicode → 日本語]',
+    );
+  });
+
+  it('decorates PlantUML too, and a raw .puml document', () => {
+    const fenced = body(doc('```plantuml', '@startuml', 'A -> B', '@enduml', '```'), {
+      diagramSources: true,
+    });
+    expect(decodeAttribute(fenced)).toBe('@startuml\nA -> B\n@enduml');
+
+    // A whole file opened as a diagram takes a different path through
+    // `renderBody` and returns before the Markdown one is reached.
+    const raw = body('@startuml\nA -> B\n@enduml\n', { diagramSources: true });
+    expect(raw).toContain('data-md-src="');
+    expect(decodeAttribute(raw)).toBe('@startuml\nA -> B\n@enduml\n');
+  });
+
+  it('leaves Graphviz alone', () => {
+    // Graphviz is rendered in the extension host and arrives finished; the
+    // client never touches the container, so it has no source to be told.
+    const html = body(doc('```dot', 'digraph { a -> b }', '```'), { diagramSources: true });
+    expect(html).toContain('<div class="graphviz" data-engine="dot">');
+    expect(html).not.toContain('data-md-src');
+  });
+
+  it('finds a diagram nested inside a block quote', () => {
+    // `withSourceLine` only ever sees top-level blocks, so a per-block
+    // decorator would miss this one entirely.
+    const html = body(doc('> ```mermaid', '> graph TD', '> ```'), { diagramSources: true });
+    expect(decodeAttribute(html)).toBe('graph TD');
+  });
+
+  it('decorates every block, not merely the first', () => {
+    const html = body(
+      doc('```mermaid', 'one', '```', '', '```mermaid', 'two', '```', '', '```plantuml', '@startuml', '@enduml', '```'),
+      { diagramSources: true },
+    );
+    expect(html.split('data-md-src="').length - 1).toBe(3);
+    expect(decodeAttribute(html)).toBe('one');
+    expect(decodeAttribute(html, html.indexOf('data-md-src') + 1)).toBe('two');
+  });
+
+  it('composes with sourceLines without disturbing the engine gate', () => {
+    // The gate probes the exact string `<pre class="mermaid">` on the
+    // UNDECORATED markup. An attribute emitted where the container is built
+    // would land inside that probe and ship a Mermaid document with no Mermaid.
+    const rendered = renderBody(doc('```mermaid', 'graph TD', '```'), {
+      title: 't',
+      dark: false,
+      sourceLines: true,
+      diagramSources: true,
+    });
+    expect(rendered.needs.mermaid).toBe(true);
+    expect(rendered.html).toContain('<pre class="mermaid code-line" data-line="0" data-md-src="');
+  });
+
+  it('encodes to an alphabet that needs no escaping', () => {
+    // Base64 cannot contain a quote, an ampersand or an angle bracket, which is
+    // why the value is interpolated raw — and why nothing downstream, including
+    // VS Code's own `data-initial-md-content` attribute, can re-escape it.
+    const html = body(doc('```mermaid', 'a --> "b" & <c>', '```'), { diagramSources: true });
+    const marker = ' data-md-src="';
+    const from = html.indexOf(marker) + marker.length;
+    expect(html.slice(from, html.indexOf('"', from))).toMatch(/^[A-Za-z0-9+/]*={0,2}$/);
+  });
+
+  it('never leaks into the default output', () => {
+    const source = doc('```mermaid', 'graph TD', '```', '', '```plantuml', '@startuml', '@enduml', '```');
+    expect(body(source)).not.toContain('data-md-src');
+    expect(renderDocument(source, { title: 't', dark: false })).not.toContain('data-md-src');
+    // The parity bytes, unchanged by the option existing at all.
+    expect(body(source, { diagramSources: false })).toBe(body(source));
+  });
+});
+
 // MARK: - §26 The stylesheet
 
 describe('stylesheet', () => {

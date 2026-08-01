@@ -55,8 +55,25 @@ CODEOWNERS
 
 # Marketplace listing copy. It is the *source* of the listing, kept beside
 # the code it describes; shipping it inside the artefact it describes
-# would be circular.
+# would be circular. `scripts/package.mjs` copies
+# marketplace/extension-README.md over README.md for the length of the vsce
+# run, so the details page ships as README.md and this directory does not.
 marketplace/**
+
+# Screenshots for the Marketplace details page. Excluding them looks wrong,
+# because the page that DOES ship references them — so, plainly: vsce
+# rewrites relative links in README.md to the repository's GitHub raw URLs
+# as it packages (`media/marketplace/preview-dark.png` becomes
+# `https://github.com/nettrash/md.vscode/raw/HEAD/media/marketplace/preview-dark.png`),
+# so the Marketplace fetches the pictures from GitHub and the .vsix has no
+# reason to carry a second copy of them. An installed extension never
+# renders that page. Verify with `node scripts/package.mjs --list`: none of
+# these paths should appear, and the packaged README.md should hold the
+# absolute URLs instead.
+media/marketplace/**
+
+# The packaging helper. It builds the .vsix; it is not part of one.
+scripts/**
 
 # The port specifications. They belong to the repository's history, not to
 # a user's extensions folder, and they are larger than the extension.

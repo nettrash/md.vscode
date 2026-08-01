@@ -296,12 +296,32 @@ function isMessage(value: unknown): value is HostMessage {
  * guards nothing an attacker can reach — the page is our own generated markup,
  * loaded from disk, in a webview with no network — it only distinguishes our
  * one inline script from anything a document might somehow contribute.
+ *
+ * Exported for `src/preview/diagramPreview.ts`, which owns a webview of its own
+ * and must mint nonces the same way.
  */
-function makeNonce(): string {
+export function makeNonce(): string {
   let out = '';
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   for (let i = 0; i < 32; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
   return out;
+}
+
+/**
+ * Extra markup a caller wants in the hosted page, over and above the CSP and
+ * the capture client.
+ *
+ * It exists for the standalone diagram preview, which shares this page shape
+ * exactly — same CSP, same rebased engine URLs, same capture client and so the
+ * same `ready` handshake — and adds only its own chrome around the figure.
+ * Anything passed here should carry `data-md-host` for the same reason
+ * everything else in this function does.
+ */
+export interface HostPageExtras {
+  /** Inserted immediately before `</head>`, so it wins over the document's own `<style>`. */
+  head?: string;
+  /** Inserted at the end of `<body>`, ahead of the capture client. */
+  body?: string;
 }
 
 /**
@@ -322,9 +342,10 @@ function makeNonce(): string {
  * nothing else. (`renderDocument` also takes an `assetBase`; doing it here
  * instead keeps every export rendering the one document the golden tests diff.)
  */
-function instrument(
+export function instrument(
   html: string,
   context: { base: string; nonce: string; cspSource: string },
+  extras: HostPageExtras = {},
 ): string {
   const { base, nonce, cspSource } = context;
 
@@ -360,9 +381,23 @@ function instrument(
 
   const client = `<script nonce="${nonce}" data-md-host="1">\n${CAPTURE_CLIENT}\n</script>`;
 
-  return rebased
-    .replace('<head>', () => `<head>\n${csp}`)
-    .replace('</body>', () => `${client}\n</body>`);
+  // Everything below is spliced into the *rebased* string, never into the
+  // caller's `extras`: a caller's own markup is its own, and having `"rich/`
+  // rewritten underneath it would be a surprise nobody would look for.
+  let out = rebased.replace('<head>', () => `<head>\n${csp}`);
+
+  // The head extra goes in before `</head>`, not after `<head>`: the document's
+  // whole palette is a `<style>` in that head, and a caller's sheet has to come
+  // after it to win without a specificity fight. Copied into a local first —
+  // TypeScript does not carry a property's narrowing into a closure, and these
+  // are function replacements for the `$` reason above.
+  const extraHead = extras.head;
+  if (extraHead !== undefined) out = out.replace('</head>', () => `${extraHead}\n</head>`);
+
+  // The capture client stays last in the body, so anything a caller adds is
+  // already in the DOM by the time it runs.
+  const tail = extras.body === undefined ? client : `${extras.body}\n${client}`;
+  return out.replace('</body>', () => `${tail}\n</body>`);
 }
 
 /**

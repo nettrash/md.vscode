@@ -18,8 +18,8 @@
 //  cannot interrupt a paragraph). A CommonMark engine produces different bytes
 //  on the first real document.
 //
-//  Two VS Code-only affordances are layered on top, both strictly additive and
-//  both off unless asked for:
+//  Three VS Code-only affordances are layered on top, all strictly additive and
+//  all off unless asked for:
 //
 //    * `opts.engines` — host-side KaTeX, highlight.js and Graphviz pre-fill the
 //      *same containers* this file already emits. A hook returning `null` must
@@ -28,8 +28,12 @@
 //      honest.
 //    * `opts.sourceLines` — `class="code-line" data-line="N"` on top-level
 //      blocks, which is how VS Code's built-in preview syncs scrolling.
+//    * `opts.diagramSources` — `data-md-src="…"` on every client-rendered
+//      diagram container, so the preview script never has to read a diagram's
+//      source back out of the live DOM.
 //
-//  Neither may leak into the default output. Byte-diff tests run with both off.
+//  None may leak into the default output. Byte-diff tests run with all three
+//  off.
 //
 
 import type { Block, ColumnAlignment, ListItem, PlacedBlock } from './types';
@@ -56,6 +60,13 @@ export interface RenderOptions {
   export?: boolean;
   /** Emit `class="code-line" data-line="N"` on top-level blocks. VS Code preview only. */
   sourceLines?: boolean;
+  /**
+   * Emit `data-md-src="<base64>"` on every Mermaid and PlantUML container, so
+   * the client script can read a block's source from the host rather than infer
+   * it from the DOM. VS Code preview only — see {@link withDiagramSources} for
+   * what goes wrong without it.
+   */
+  diagramSources?: boolean;
   /** When omitted, every container is emitted exactly as MarkdownHTML.swift emits it. */
   engines?: EngineHooks;
   /** Override the `<head>` asset URLs (VS Code rewrites these to webview URIs). No trailing slash. */
@@ -236,8 +247,13 @@ export function renderBody(source: string, opts: RenderOptions): { html: string;
     // failure it restores the source, so an invalid diagram still shows its
     // text. PlantUML is not a host-side engine — it needs a real canvas's
     // `measureText` — so there is no hook to consult here.
+    //
+    // The decoration is applied to this return as well as to the Markdown one:
+    // a `.puml` file opened in the editor gets a preview like any other
+    // document, and its one block is exactly as exposed to a morph.
+    const plantuml = `<div class="plantuml">${escapeHTML(source)}</div>`;
     return {
-      html: `<div class="plantuml">${escapeHTML(source)}</div>`,
+      html: opts.diagramSources === true ? withDiagramSources(plantuml) : plantuml,
       needs: { math: false, mermaid: false, plantuml: true, graphviz: false, highlight: false },
     };
   }
@@ -313,6 +329,12 @@ export function renderBody(source: string, opts: RenderOptions): { html: string;
   const needs = engineNeeds(bodyPlain);
 
   let html = opts.sourceLines ? withFootnotes(decorated.join('\n'), definitions) : bodyPlain;
+
+  // Before KaTeX, deliberately: every byte of the body is still ours at this
+  // point, all of it produced by the emitters above, so the container scan is
+  // reasoning about markup whose shape it controls. A filled math container
+  // holds arbitrary KaTeX output.
+  if (opts.diagramSources === true) html = withDiagramSources(html);
 
   // Inline math is produced by `inline()`, which has no access to the hooks, so
   // KaTeX is applied here as a post-pass over the finished body — the same
@@ -1023,6 +1045,143 @@ function decodeEntities(s: string): string {
     .replaceAll('&gt;', '>')
     .replaceAll('&quot;', '"')
     .replaceAll('&amp;', '&');
+}
+
+// MARK: - Diagram source attributes (VS Code only)
+
+/**
+ * The attribute carrying a diagram block's own source, base64-encoded.
+ *
+ * Read by `md-preview.ts`, and by nothing else in this family: the apps reload
+ * their whole preview on every edit, so a block there is always holding its own
+ * source when an engine is pointed at it.
+ */
+const DIAGRAM_SOURCE_ATTRIBUTE = 'data-md-src';
+
+/**
+ * The two containers the *client* renders, as tag prefixes.
+ *
+ * `<div class="graphviz"` is deliberately absent: Graphviz runs in the extension
+ * host, the container arrives holding a finished `<svg>`, and the preview script
+ * never touches it — so it has no source to be told.
+ *
+ * The prefixes stop short of the closing quote of the class attribute, the same
+ * trick {@link MATH_CONTAINERS} uses, so that they keep matching after
+ * `withSourceLine` has appended `code-line` to the class list.
+ */
+const DIAGRAM_CONTAINERS: ReadonlyArray<{ open: string; close: string }> = [
+  { open: '<pre class="mermaid', close: '</pre>' },
+  { open: '<div class="plantuml', close: '</div>' },
+];
+
+/**
+ * Base64 of the UTF-8 bytes of `text`.
+ *
+ * Base64 rather than an HTML-escaped attribute for three reasons, in order of
+ * how much they cost when ignored:
+ *
+ *   1. The alphabet is `A–Z a–z 0–9 + / =`, so the value can never contain a
+ *      quote, an ampersand or an angle bracket and needs no escaping here — and,
+ *      more to the point, cannot be *re*-escaped by anything downstream. This
+ *      body is interpolated into VS Code's `data-initial-md-content` attribute,
+ *      which is itself HTML-escaped, so an escaped payload would go through two
+ *      rounds of entity encoding and one round of decoding.
+ *   2. Mermaid arrows are `-->`. HTML-escaping a diagram's source triples the
+ *      size of every arrow in it; base64 costs a flat four bytes for three.
+ *   3. Whitespace in an attribute value survives the parser, but only after the
+ *      input stream has normalised `\r\n` and `\r` to `\n`. Base64 has no
+ *      whitespace to normalise, so what the client decodes is what the author
+ *      wrote, byte for byte.
+ *
+ * `btoa` takes a binary string, so the UTF-8 bytes are walked in chunks:
+ * `String.fromCharCode(...bytes)` on a whole long document would exhaust the
+ * argument limit and throw.
+ */
+function encodeDiagramSource(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  const CHUNK = 0x8000;
+  let binary = '';
+  for (let at = 0; at < bytes.length; at += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(at, at + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Add `data-md-src` to every Mermaid and PlantUML container in a finished body.
+ *
+ * WHY THE CLIENT CANNOT JUST READ THE DOM
+ * ---------------------------------------
+ * VS Code's built-in preview does not reload on an edit; it patches the live
+ * DOM with morphdom. morphdom keys nodes by `id`, and when it meets an old child
+ * it cannot reconcile it does *not* remove a keyed one — it records the key and
+ * resolves it once, at the end, through a lookup that holds only the **last**
+ * element seen with that key. Two elements sharing an id therefore leave one of
+ * them orphaned in the page.
+ *
+ * Two identical Mermaid diagrams in one document produce exactly that: both are
+ * served the same cached SVG, so both hold `<svg id="mermaid-…">` with the same
+ * id, and the next edit leaves one of those SVGs sitting inside its `<pre>`
+ * alongside the block's restored source — with the attributes synced, so the
+ * client's own "already rendered" marker is gone. A client that reads the source
+ * back out of that element gets `<svg …>…</svg>graph TD…`, and Mermaid — which
+ * reads `element.innerHTML`, not `textContent` — parses its own output as a
+ * diagram and draws "Syntax error in text".
+ *
+ * With the source in an attribute the host wrote, no arrangement of the DOM can
+ * mislead the client: it knows what the block says, resets the block to it, and
+ * renders that.
+ *
+ * WHY THIS IS A POST-PASS RATHER THAN PART OF `renderCodeBlock`
+ * ------------------------------------------------------------
+ * The engine gate reads the *undecorated* markup and probes for the exact
+ * strings `<pre class="mermaid">` and `<div class="plantuml">`. Emitting the
+ * attribute where the container is built would put it inside those probes and
+ * ship a Mermaid document with no Mermaid. Running afterwards, over the
+ * decorated copy only, leaves the gate reading precisely the bytes
+ * MarkdownHTML.swift would have produced.
+ *
+ * It also picks up containers `withSourceLine` cannot see: `renderBlock`
+ * recurses into block quotes, so a diagram inside a quote is not a top-level
+ * block and never passes through the per-block decorator.
+ *
+ * Finding the close tag by simple search is safe for the reason `fillMath`
+ * gives: the content of one of these containers is fully escaped text, so no
+ * `<` survives inside it, the next matching close tag really is the element's
+ * own, and no second opener can hide within it. Decoding that content back is
+ * how the source is recovered — it is the same round trip `el.textContent`
+ * performs in the page, so the two can never disagree.
+ */
+function withDiagramSources(body: string): string {
+  let out = '';
+  let cursor = 0;
+  for (;;) {
+    let openAt = -1;
+    let container: (typeof DIAGRAM_CONTAINERS)[number] | null = null;
+    for (const candidate of DIAGRAM_CONTAINERS) {
+      const at = body.indexOf(candidate.open, cursor);
+      if (at >= 0 && (openAt < 0 || at < openAt)) {
+        openAt = at;
+        container = candidate;
+      }
+    }
+    if (container === null) break;
+    // Everything interpolated into one of these opening tags is escaped, so no
+    // attribute value can contain a `>` and the first one really does end the
+    // tag — the same argument `withSourceLine` makes.
+    const tagEnd = body.indexOf('>', openAt + container.open.length);
+    if (tagEnd < 0) break;
+    const contentEnd = body.indexOf(container.close, tagEnd + 1);
+    if (contentEnd < 0) break;
+    const source = decodeEntities(body.slice(tagEnd + 1, contentEnd));
+    out +=
+      body.slice(cursor, tagEnd) +
+      ` ${DIAGRAM_SOURCE_ATTRIBUTE}="${encodeDiagramSource(source)}"`;
+    // Resume at the `>` we stopped short of, so the tag is closed and the
+    // content copied on the next pass through.
+    cursor = tagEnd;
+  }
+  return out + body.slice(cursor);
 }
 
 // MARK: - Source-line attributes (VS Code only)

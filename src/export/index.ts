@@ -35,6 +35,7 @@ import { frontMatter, outline } from '../render/parser';
 import { renderDocument } from '../render/html';
 import { trimWSNL } from '../render/text';
 import { readConfig } from '../preview/config';
+import { openDiagramPreview } from '../preview/diagramPreview';
 
 import {
   applyImageReplacements,
@@ -230,19 +231,23 @@ export async function exportPdf(document: vscode.TextDocument): Promise<void> {
 // MARK: - Diagram preview
 
 /**
- * Open a `.puml` / `.gv` file in a rendered panel and leave it there.
+ * Open a `.puml` / `.gv` file in a live preview panel.
  *
- * The one command here that is not an export: it uses the same render surface,
- * with the same engines and the same handshake, and simply never captures
- * anything or disposes the panel. A raw diagram document renders as a single
- * diagram container — `renderBody` recognises the file and does not parse it as
- * Markdown — so what appears is the picture and nothing else.
+ * The one command in this file that is not an export, and the only one whose
+ * work does not belong here: an export renders once, takes something out and
+ * disposes its surface, whereas this panel stays open, re-renders as the file is
+ * typed and follows the workbench theme. That is a preview, so it lives in
+ * `src/preview/diagramPreview.ts` — which shares this folder's render surface
+ * rather than standing up a second one.
+ *
+ * The command id and this function's name are kept because `package.json` and
+ * `extension.ts`'s command table both name them.
  */
 export async function showDiagramPreview(document: vscode.TextDocument): Promise<void> {
-  const title = baseName(document);
-  const html = renderDocument(document.getText(), { title, dark: false, export: true });
-  // Deliberately not disposed: this panel *is* the deliverable.
-  await RenderHost.open(html, { title: `md — ${title}` });
+  // Nothing to await: the panel opens immediately and reports its own progress
+  // in its own status line. A command that sat silently for the twenty seconds a
+  // class diagram can take would read as a broken command.
+  openDiagramPreview(document);
 }
 
 // MARK: - Shared plumbing

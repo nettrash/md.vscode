@@ -53,6 +53,7 @@ import {
 } from './export/index';
 import { richDirectory } from './preview/assets';
 import { affectsPreview, readConfig } from './preview/config';
+import { disposeDiagramPreviews, registerDiagramPreviews } from './preview/diagramPreview';
 import { extendMarkdownIt } from './preview/markdownItHook';
 
 /** The public API object VS Code reads after activating us. */
@@ -68,6 +69,12 @@ export function activate(context: vscode.ExtensionContext): MdApi {
   setRichRoot(richDirectory(context.extensionUri.fsPath));
 
   registerCommands(context);
+
+  // The standalone `.puml` / `.gv` panels: their own debounce, their own theme
+  // listener, and a disposable that closes every open panel. Registered here
+  // rather than lazily on the first preview so that everything they own is in
+  // `context.subscriptions` from the start.
+  registerDiagramPreviews(context);
 
   context.subscriptions.push(
     // The palette, the two font stacks and `data-md-dark` are baked into the
@@ -93,9 +100,18 @@ export function activate(context: vscode.ExtensionContext): MdApi {
 }
 
 export function deactivate(): void {
-  // Nothing to undo: every listener and command is in `context.subscriptions`,
-  // which VS Code disposes for us, and the engines hold no handles worth
-  // closing — the vendored files are read once and cached in memory.
+  // Almost nothing to undo: every listener and command is in
+  // `context.subscriptions`, which VS Code disposes for us, and the engines hold
+  // no handles worth closing — the vendored files are read once and cached in
+  // memory.
+  //
+  // The one exception is a diagram preview panel, because it is not merely a
+  // listener: it holds a live Chromium context with up to 11 MB of engines in
+  // it, and one left behind is visible in Activity Monitor. Disposing the
+  // subscription registered in `activate` already closes them; this call is the
+  // belt to that pair of braces, for the shutdown orders in which `deactivate`
+  // runs first. It is idempotent.
+  disposeDiagramPreviews();
 }
 
 // MARK: - Commands

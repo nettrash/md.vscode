@@ -151,6 +151,29 @@ const CACHE_LIMIT = 32;
 /** Marks a block this file has finished with. See {@link markerFor}. */
 const MARKER = 'data-md-rendered';
 
+/**
+ * Carries a block's own source, base64-encoded, written by the host.
+ *
+ * See {@link sourceOf} for why the DOM cannot be asked instead. The emitter is
+ * `withDiagramSources` in `render/html.ts`, behind `opts.diagramSources`; the
+ * two names have to move together.
+ */
+const SOURCE_ATTRIBUTE = 'data-md-src';
+
+/**
+ * The cache key's field separator: NUL.
+ *
+ * A character no diagram source can contain, which is what stops a key from
+ * being ambiguous about where the theme ends and the kind begins.
+ *
+ * Written as an escape, and it must stay one. As a *literal* NUL — which is how
+ * it was first written, twice, inside these string literals — it makes the whole
+ * file register as binary: `grep` silently finds nothing in it and `file`
+ * reports "data". The character is identical either way; only the file is
+ * readable.
+ */
+const SEPARATOR = '\u0000';
+
 // ---------------------------------------------------------------------------
 //  MARK: - Engine surfaces
 // ---------------------------------------------------------------------------
@@ -198,15 +221,6 @@ function mermaidGlobal(): MermaidApi | undefined {
 // ---------------------------------------------------------------------------
 
 /**
- * Original source text of every block we have replaced with a diagram.
- *
- * Weak on purpose: when VS Code swaps documents it replaces the whole
- * `.markdown-body` element, and the old blocks — with their entries — become
- * garbage on their own.
- */
-const sources = new WeakMap<Element, string>();
-
-/**
  * Rendered SVG by `theme + kind + source`; `null` records a diagram that has
  * already refused once.
  *
@@ -218,10 +232,19 @@ const sources = new WeakMap<Element, string>();
  * one class diagram would spend twenty seconds re-failing after each character
  * typed anywhere in the file.
  *
- * Re-instating identical markup can duplicate Mermaid's element ids when the
- * same diagram appears twice in a document (Mermaid runs with
- * `deterministicIds: false`). The two blocks are identical, so what they draw
- * is identical too; it is not worth forcing ids to differ.
+ * Re-instating identical markup duplicates Mermaid's element ids when the same
+ * diagram appears twice in a document (Mermaid runs with
+ * `deterministicIds: false`, so the two blocks get different ids on their first
+ * render and the *same* one from here afterwards). What the two blocks draw is
+ * identical, so the duplication is invisible — but it is not harmless: morphdom
+ * keys nodes by id, and a duplicate id is what makes it orphan one of the two
+ * `<svg>`s inside its `<pre>` on the next edit. See {@link sourceOf}. Forcing
+ * the ids apart would mean rewriting the SVG on every restore; being unable to
+ * be fooled by an orphan is cheaper and covers more than this one cause.
+ *
+ * The key is built from the block's *declared* source — see {@link cacheKey} —
+ * never from what the block currently contains, so a poisoned DOM cannot mint a
+ * key or reach an entry.
  */
 const cache = new Map<string, string | null>();
 
@@ -341,7 +364,7 @@ function loadPlantUml(): Promise<PlantUmlModule> {
 // ---------------------------------------------------------------------------
 
 function cacheKey(kind: string, source: string): string {
-  return (dark ? 'd' : 'l') + ' ' + kind + ' ' + source;
+  return (dark ? 'd' : 'l') + SEPARATOR + kind + SEPARATOR + source;
 }
 
 function cachePut(key: string, value: string | null): void {
@@ -361,17 +384,68 @@ function cachePut(key: string, value: string | null): void {
 // ---------------------------------------------------------------------------
 
 /**
- * The source text of a block that has not been rendered yet.
+ * A block's own source, as the host declared it — or `null` if it did not.
  *
- * The DOM is the authority whenever the block is unmarked: after VS Code has
- * morphed new content over it, the element still exists but its children are
- * the *new* source, and a remembered copy would be stale. The remembered copy
- * is only for blocks whose content we have already replaced with an SVG.
+ * WHY THE DOM IS NOT ASKED
+ * ------------------------
+ * This used to read `el.textContent` and remember it in a `WeakMap`. Both halves
+ * of that are unsound in a page that is patched rather than reloaded, and the
+ * patching is morphdom's, with rules of its own:
+ *
+ *   * morphdom keys nodes by `id`. When it meets an old child it cannot
+ *     reconcile with the new one it does **not** remove a keyed node — it
+ *     records the key and resolves it once, at the very end, through a lookup
+ *     holding only the *last* element seen with that key. Two elements sharing
+ *     an id therefore leave one of them behind.
+ *   * Two identical Mermaid diagrams in one document are served the same cached
+ *     SVG, so both hold `<svg id="mermaid-…">` with the same id. The next edit
+ *     orphans one of those SVGs *inside its own `<pre>`*, next to the restored
+ *     source — and the attribute sync has already taken {@link MARKER} off, so
+ *     nothing says the block was ever rendered.
+ *
+ * Reading `textContent` there yields the SVG's stylesheet followed by the real
+ * source. Mermaid then draws "Syntax error in text" — it reads
+ * `element.innerHTML`, so it is handed the `<svg>` element itself — and the
+ * error box is cached under that nonsense key and marked as a success.
+ *
+ * An attribute the host wrote cannot be fooled by any of it: morphdom syncs
+ * attributes from the new element, so `data-md-src` either survives unchanged or
+ * is replaced by the new source, and is never a function of what the element
+ * contains.
+ *
+ * THE FALLBACK, AND ITS CONDITION
+ * -------------------------------
+ * `previewBody` always sets the attribute, so in the shipping preview it is
+ * always there. It can be absent only for a body this extension did not render —
+ * and reading `textContent` there is not wrong in itself; it was wrong only for
+ * a block that is holding something other than its own source.
+ *
+ * That condition is checkable, so it is checked rather than assumed: the host
+ * escapes every diagram's source, so a container written by the host holds one
+ * text node and nothing else. **An element child means somebody else has been in
+ * there** — a rendered `<svg>`, an orphaned one, an error box — and the DOM has
+ * stopped being evidence of what the author wrote. `null` then, and every caller
+ * treats it as "leave this block exactly as it is", which is the honest answer:
+ * whatever it is showing beats a diagram drawn from a guess.
  */
-function sourceOf(el: Element): string {
-  const text = el.textContent ?? '';
-  sources.set(el, text);
-  return text;
+function sourceOf(el: Element): string | null {
+  const encoded = el.getAttribute(SOURCE_ATTRIBUTE);
+  if (encoded === null) {
+    return el.firstElementChild === null ? (el.textContent ?? '') : null;
+  }
+  try {
+    // `atob` yields one character per byte; the source is UTF-8, so the bytes
+    // have to be handed to a decoder rather than used as text. Skipping that
+    // step silently mangles every diagram with a non-ASCII label in it.
+    const binary = atob(encoded);
+    const bytes = new Uint8Array(binary.length);
+    for (let at = 0; at < binary.length; at++) bytes[at] = binary.charCodeAt(at);
+    return new TextDecoder().decode(bytes);
+  } catch {
+    // Not valid base64 — so not something this file wrote, and not something to
+    // guess at either.
+    return null;
+  }
 }
 
 /**
@@ -394,16 +468,17 @@ function markerFor(el: Element, value: 'mermaid' | 'plantuml' | 'failed'): void 
  * theme.
  *
  * Blocks marked `failed` are left alone: a diagram that refused to lay out will
- * refuse again, and retrying costs the full 20 s budget. Blocks whose source we
- * somehow do not have are also left alone — unmarking one would make the next
- * pass read its rendered SVG *as if it were the source*.
+ * refuse again, and retrying costs the full 20 s budget. Blocks that do not
+ * declare a source are also left alone — restoring one would mean putting back
+ * whatever the element currently says, which for a rendered block is its own
+ * SVG.
  */
 function resetRendered(root: ParentNode): void {
   for (const el of Array.from(root.querySelectorAll(`[${MARKER}]`))) {
     const value = el.getAttribute(MARKER);
     if (value !== 'mermaid' && value !== 'plantuml') continue;
-    const source = sources.get(el);
-    if (source === undefined) continue;
+    const source = sourceOf(el);
+    if (source === null) continue;
     el.textContent = source;
     // Mermaid skips any node carrying `data-processed`, so a re-run would
     // silently do nothing if this were left behind.
@@ -451,15 +526,23 @@ async function renderMermaid(gen: number, root: ParentNode): Promise<void> {
 
   // Anything the cache can answer needs no engine at all, and a document whose
   // diagrams are all cached never pays the 3.5 MB.
-  const fresh: HTMLElement[] = [];
+  //
+  // The source travels alongside the element from here on. Re-reading it later
+  // would be re-reading the DOM, which is the whole thing this is avoiding, and
+  // it would also be *wrong*: the block is about to be filled with an SVG.
+  const fresh: { el: HTMLElement; source: string }[] = [];
   for (const el of pending) {
     const source = sourceOf(el);
+    // A block that does not declare its source is one this file cannot reason
+    // about. Leave it exactly as it is: whatever it is showing, that is more
+    // honest than a diagram drawn from a guess.
+    if (source === null) continue;
     const cached = cache.get(cacheKey('mermaid', source));
     if (typeof cached === 'string') {
       el.innerHTML = cached;
       markerFor(el, 'mermaid');
     } else {
-      fresh.push(el);
+      fresh.push({ el, source });
     }
   }
   if (!fresh.length) return;
@@ -473,6 +556,20 @@ async function renderMermaid(gen: number, root: ParentNode): Promise<void> {
 
   const mermaid = mermaidGlobal();
   if (!mermaid) return;
+
+  // THE BLOCK IS PUT BACK TO ITS DECLARED SOURCE BEFORE THE ENGINE SEES IT.
+  //
+  // Mermaid reads `element.innerHTML` — not `textContent` — decodes the entities
+  // and parses the result. So whatever else is sitting in the block goes into
+  // the diagram: an `<svg>` orphaned there by a morph (see {@link sourceOf}) is
+  // handed straight back to the engine that drew it, and Mermaid renders
+  // "Syntax error in text" over the top of it.
+  //
+  // Writing the source back costs one text node per block per pass and makes
+  // that impossible to arrange, whatever the host has done to the page. It is
+  // also what makes the redraw use the source the *document* now has rather
+  // than whatever the element happens to be showing.
+  for (const block of fresh) block.el.textContent = block.source;
 
   try {
     mermaid.startOnLoad = false;
@@ -489,16 +586,16 @@ async function renderMermaid(gen: number, root: ParentNode): Promise<void> {
     // `Array.from(nodes)` either way, and it would skip the rendered ones
     // anyway (they carry `data-processed`) — but being explicit is what stops a
     // second pass from reaching into a diagram it already drew.
-    await mermaid.run({ nodes: fresh });
+    await mermaid.run({ nodes: fresh.map((block) => block.el) });
   } catch {
     /* handled by Mermaid, in the block itself */
   }
 
-  for (const el of fresh) {
+  for (const block of fresh) {
+    const el = block.el;
     if (!el.hasAttribute('data-processed') && !el.querySelector('svg')) continue;
     markerFor(el, 'mermaid');
-    const source = sources.get(el);
-    if (source !== undefined) cachePut(cacheKey('mermaid', source), el.innerHTML);
+    cachePut(cacheKey('mermaid', block.source), el.innerHTML);
   }
 }
 
@@ -570,9 +667,16 @@ async function renderPlantUml(gen: number, root: ParentNode): Promise<void> {
   const pending = Array.from(root.querySelectorAll<HTMLElement>(`div.plantuml:not([${MARKER}])`));
   if (!pending.length) return;
 
-  const fresh: HTMLElement[] = [];
+  // Same shape as Mermaid's, and for the same reason: the source rides along
+  // with the element rather than being read back out of it later. PlantUML is
+  // handed a `string[]` rather than an element, so it cannot be fed an orphaned
+  // `<svg>` the way Mermaid can — but the *cache key* is built from the same
+  // text, and a key computed from a poisoned DOM would file the diagram under a
+  // name nothing will ever look up again.
+  const fresh: { el: HTMLElement; source: string }[] = [];
   for (const el of pending) {
     const source = sourceOf(el);
+    if (source === null) continue;
     const cached = cache.get(cacheKey('plantuml', source));
     if (typeof cached === 'string') {
       el.innerHTML = cached;
@@ -582,7 +686,7 @@ async function renderPlantUml(gen: number, root: ParentNode): Promise<void> {
       // text on screen rather than spending the budget to fail again.
       markerFor(el, 'failed');
     } else {
-      fresh.push(el);
+      fresh.push({ el, source });
     }
   }
   if (!fresh.length) return;
@@ -594,14 +698,15 @@ async function renderPlantUml(gen: number, root: ParentNode): Promise<void> {
     return; // Leave the raw source visible if the engine cannot load.
   }
 
-  for (const el of fresh) {
+  for (const block of fresh) {
+    const el = block.el;
     if (gen !== generation) return;
     // A morph may have taken the block out of the document while we were
     // waiting; the engine would not find it, and we would burn 20 s learning so.
     if (!el.isConnected) continue;
 
     assignPlantUmlId(el);
-    const source = sources.get(el) ?? el.textContent ?? '';
+    const source = block.source;
     // The engine wants an array of lines, split on bare "\n" — the host has
     // already normalised line endings.
     const lines = source.split('\n');

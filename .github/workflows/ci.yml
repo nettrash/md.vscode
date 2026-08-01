@@ -67,18 +67,32 @@ jobs:
         run: npm run compile
 
       - name: Package
-        # `vsce ls` prints the exact file manifest the .vsix will carry, so
-        # a mistake in .vscodeignore — the whole of `media/rich/` dropped,
-        # or `node_modules` swept in — shows up in the log as a list rather
-        # than as an extension that installs and cannot find its engines.
+        # Not `vsce package` directly. The Marketplace details page is a
+        # different document from this repository's README, and vsce has no
+        # --readme-path: the details tab is always README.md at the root of
+        # the .vsix. `scripts/package.mjs` therefore stands
+        # marketplace/extension-README.md in at that filename for the length
+        # of the vsce run and puts the real one back afterwards — from a
+        # finally block, from SIGINT/SIGTERM and from uncaughtException, with
+        # a hash check that the restored file is byte-identical. Calling vsce
+        # straight from here would silently publish the wrong document.
         #
-        # `npm exec --no` for the same reason as the toolchain step above: it
-        # refuses to reach the registry, so a tool missing from
-        # devDependencies fails loudly here instead of running whatever
-        # happens to own that name on npm.
-        run: |
-          npm exec --no -- vsce ls
-          npm exec --no -- vsce package
+        # `--list` is the old `vsce ls` line, moved inside that script so it
+        # runs against the same tree vsce packages. It prints the exact file
+        # manifest the .vsix will carry, so a mistake in .vscodeignore — the
+        # whole of `media/rich/` dropped, or `node_modules` swept in — shows
+        # up in the log as a list rather than as an extension that installs
+        # and cannot find its engines.
+        #
+        # The script shells out through `npm exec --no`, for the same reason
+        # as the toolchain step above: it refuses to reach the registry, so a
+        # tool missing from devDependencies fails loudly here instead of
+        # running whatever happens to own that name on npm.
+        #
+        # `npm run package` is deliberately NOT what runs here: it re-runs the
+        # type-check, the tests and the compile, which are the three steps
+        # immediately above.
+        run: node scripts/package.mjs --list
 
       - name: Upload the packaged extension
         # The siblings upload artifacts only `if: failure()`, because there

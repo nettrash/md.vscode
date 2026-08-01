@@ -11,12 +11,48 @@ worth knowing about the Marketplace. App Store Connect and the Play
 Console are web forms, so `md/appstore/` and `md.Android/play/` keep one
 plain-text file per field to paste in. **The Marketplace has no form.**
 Every word of the listing is read out of the `.vsix`: the fields come
-from `package.json`, the details tab is `README.md` rendered, the
-changelog tab is `CHANGELOG.md`, the licence tab is `LICENSE`. So there
-is nothing to paste and nothing to keep in sync — the copy is versioned
-with the code by necessity here, not merely by preference — and this file
-is the map of where each field actually comes from, plus the rules the
-wording follows.
+from `package.json`, the details tab is the packaged `README.md`
+rendered, the changelog tab is `CHANGELOG.md`, the licence tab is
+`LICENSE`. So there is nothing to paste and nothing to keep in sync — the
+copy is versioned with the code by necessity here, not merely by
+preference — and this file is the map of where each field actually comes
+from, plus the rules the wording follows.
+
+## Two READMEs, and why
+
+**The details tab is no longer this repository's root `README.md`. It is
+[`extension-README.md`](extension-README.md), in this directory, which
+the packaging step copies over the root `README.md` while the `.vsix` is
+built and restores afterwards.** The two documents are written for two
+different readers and neither can serve both:
+
+- The **root `README.md`** is for someone reading the source. It explains
+  the port, the parity contract, which engine runs where and why, and how
+  to build. It stays on GitHub, where that reader is.
+- **`marketplace/extension-README.md`** is for someone deciding whether
+  to press Install. It leads with what they get, shows screenshots, and
+  puts the commands and every setting in two tables they can scan.
+
+The swap is a copy rather than a flag because **`vsce` has no
+`--readme-path` option** — measured on vsce 3.9.2, not assumed. The
+details tab is `README.md` at the root of the package, full stop, and the
+same is true of the other two tabs: changelog is `CHANGELOG.md`, licence
+is `LICENSE`. The options that do exist nearby are `--baseContentUrl`,
+`--baseImagesUrl`, `--githubBranch` and `--no-rewrite-relative-links`,
+all of which shape how links inside that one file are rewritten and none
+of which can point it somewhere else.
+
+Two consequences follow, and both are easy to get wrong:
+
+- **Relative paths in `extension-README.md` are written as if the file
+  sat at the repository root**, because that is where it is read from at
+  package time. `media/marketplace/preview-dark.png` and `LICENSE` are
+  correct as written. A path relative to `marketplace/` would resolve to
+  nothing.
+- **The screenshots must be committed and pushed before publishing.**
+  vsce rewrites those relative image paths to raw GitHub URLs on the
+  repository's branch, so a page whose images exist only in the working
+  tree publishes with three holes in it.
 
 | Source | Marketplace field | Limit | Current (1.0.0) |
 | --- | --- | --- | --- |
@@ -26,9 +62,10 @@ wording follows.
 | `package.json` `version` | Version | must be `major.minor.patch` | `1.0.0` |
 | `package.json` `categories` | Categories | fixed vocabulary | 3 |
 | `package.json` `keywords` | Tags, used by search | not published | 5 |
-| `package.json` `galleryBanner` | Banner behind the name | — | `#F4EFE4`, light |
+| `package.json` `galleryBanner` | Banner behind the name | — | `#2B221C`, dark |
 | `media/icon.png` | Icon | 128 × 128 recommended | 512 × 512, 134 KB |
-| `README.md` | Details tab | none in practice | the whole file |
+| `marketplace/extension-README.md`, packaged as `README.md` | Details tab | none in practice | the whole file |
+| `media/marketplace/*.png` | The screenshots inside that tab | — | 3, rewritten to raw GitHub URLs |
 | `CHANGELOG.md` | Changelog tab | none in practice | the whole file |
 | `LICENSE` | License tab | — | MIT |
 | `package.json` `repository` `bugs` `homepage` | Resources links | — | set |
@@ -55,23 +92,31 @@ refuses the manifest outright if either is wrong.
 
 ## What the page will and will not render
 
-The details tab is `README.md` rendered as Markdown, not as a web page.
-Three consequences shape how the README is written:
+The details tab is `extension-README.md` rendered as Markdown, not as a
+web page. Four consequences shape how it is written:
 
-- **Raw HTML is sanitised**, so nothing may depend on it. The README uses
+- **Raw HTML is sanitised**, so nothing may depend on it. The page uses
   none — which is also the family rule for the app READMEs, and for the
   same reason the App Store copy carries no angle brackets: a store page
   reads markup as markup and answers with either a rejection or a hole.
-  Never paste HTML samples into listing copy.
+  Never paste HTML samples into listing copy. The same restraint is why
+  the private-note feature is described there without quoting the comment
+  syntax it uses.
 - **Relative links are rewritten** against `package.json` `repository`
   when the package is built, which is why `[LICENSE](LICENSE)` resolves
-  on the Marketplace page at all. A link that must not be rewritten has
-  to be absolute.
+  on the Marketplace page at all, and why the screenshots are referenced
+  as `media/marketplace/…` rather than by absolute URL. A link that must
+  not be rewritten has to be absolute.
 - **Badges render only from approved domains.** The build badge points at
-  `github.com`, which is one of them; a badge served from anywhere else
-  is stripped rather than shown. And a badge must point at a workflow
-  that exists — the Android repo ships no CI and therefore no badge, on
-  purpose.
+  `github.com` and the version, install, rating and licence badges at
+  `img.shields.io`, both of which are on Microsoft's approved list. A
+  badge served from anywhere else is stripped rather than shown. And a
+  badge must point at a workflow that exists — the Android repo ships no
+  CI and therefore no badge, on purpose.
+- **The three shields.io Marketplace badges read live counts** for
+  `nettrash.md-vscode` and therefore show nothing useful, or an error
+  slug, until the first version is published. That is expected and needs
+  no edit — they fill themselves in.
 
 ## Ground rules these texts follow
 
@@ -79,10 +124,16 @@ Every claim was checked against the shipping build. A listing that
 describes the roadmap rather than the version attached to it is the way
 this goes wrong, whichever store it is.
 
-- No references to the other platforms, no competitor comparisons, no
-  pricing, promotions or "free", no unverifiable superlatives, no rating
-  requests. The README's "the simplest Markdown preview" is the family's
-  one superlative and it stays in the README, where it is not store copy.
+- No competitor comparisons, no pricing, promotions or "free", no
+  unverifiable superlatives, no rating requests. The root README's "the
+  simplest Markdown preview" is the family's one superlative and it stays
+  there, where it is not store copy.
+- The App Store's "do not name another platform" rule is **Apple's, and
+  does not travel here**. The details tab names the iPhone, iPad, Mac and
+  Android siblings and links to them, because they are one product and a
+  reader deciding whether to install is better off knowing it. What must
+  still be said is *where* they are the same — see the parity bullet
+  below.
 - Third-party names (Markdown, LaTeX, KaTeX, mhchem, Mermaid, Graphviz,
   Viz.js, PlantUML, highlight.js, EPUB) are used descriptively, and
   Microsoft's (Visual Studio Code, Marketplace) without implying
@@ -109,11 +160,24 @@ another, and they are cheap to lose.
 
 - **Not "no third-party dependencies", not "no third-party libraries".**
   The extension vendors KaTeX with mhchem, Mermaid, Viz.js carrying
-  Graphviz, PlantUML and highlight.js. Only the *TypeScript* side is
-  package-free: `package.json` has no `dependencies` block at all. The
-  safe phrasing is the README's — "no runtime npm packages" plus "the
-  only vendored code is the offline math / diagram engines under
-  `media/rich/`", naming all six.
+  Graphviz, PlantUML and highlight.js, and that is six third-party
+  projects however few npm packages the TypeScript side resolves. The
+  details tab therefore makes no claim about dependencies at all: it says
+  the engines are carried inside the extension and names all six with
+  their licences, in a table at the foot of the page. Any sentence about
+  npm in listing copy has to be checked against `package.json` on the day
+  it is written, not remembered — the manifest's `dependencies` block has
+  changed under this file once already.
+- **Engine licences are quoted from the files, not from memory.**
+  `media/rich/highlight.min.js` carries a banner reading BSD-3-Clause and
+  `media/rich/viz-global.js` one naming Graphviz and Expat as bundled in
+  object-code form. The others carry no banner, so their licences come
+  from upstream and from the CHANGELOG that recorded them at vendoring
+  time: KaTeX and mhchem MIT, Mermaid MIT, Graphviz EPL-1.0, Viz.js MIT,
+  PlantUML GPL. Mermaid's bundle additionally names DOMPurify
+  (Apache-2.0 and MPL-2.0), js-yaml, Lodash and parts of Cytoscape (MIT),
+  which is why the details tab lists them in a sentence of their own.
+  Re-check the banners when an engine is next updated.
 - **Not "no permissions" and not "no network".** The extension asks for
   nothing and contacts nothing of ours, but a document that names an
   image by URL still causes the preview to fetch it, and Visual Studio

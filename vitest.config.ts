@@ -11,6 +11,9 @@
 //    * `test/engines.test.ts` loads the vendored engines out of `media/rich`
 //      with Node's own `require`, so it needs the real Node environment and a
 //      real working directory.
+//    * `test/preview-config.test.ts` exercises `src/preview/config.ts`, which
+//      imports `vscode` — a module that only exists inside a running editor.
+//      The alias below points that specifier at `test/vscode-stub.ts`.
 //
 //  Hence `environment: 'node'` — never jsdom. Beyond being unnecessary, jsdom
 //  would be actively misleading: `specs/12-CSP-GROUND-TRUTH.md` measured Mermaid
@@ -19,10 +22,23 @@
 //  PlantUML are tested where they run — in a browser — and not here.
 //
 
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // `vscode` is provided by the extension host at runtime and by
+    // `@types/vscode` at compile time; there is no package to import. This makes
+    // the specifier resolvable *for the test run only* — esbuild keeps it
+    // external in the shipped bundle, and nothing under `src/render/**` is
+    // allowed to reach for it in the first place.
+    //
+    // An exact-string alias rather than a regular expression, so it can never
+    // catch a path that merely contains the word.
+    alias: {
+      vscode: fileURLToPath(new URL('./test/vscode-stub.ts', import.meta.url)),
+    },
     // Explicit imports of `describe` / `it` / `expect` everywhere. Globals
     // would need a `types` entry in tsconfig.json, which is frozen.
     globals: false,
