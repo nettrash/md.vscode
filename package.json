@@ -1,0 +1,272 @@
+{
+  "name": "md-vscode",
+  "displayName": "md",
+  "description": "Markdown preview with math, chemistry and diagrams — KaTeX, Mermaid, Graphviz and PlantUML, all rendered on-device with nothing sent anywhere.",
+  "version": "1.0.0",
+  "publisher": "nettrash",
+  "license": "MIT",
+  "author": {
+    "name": "Ivan Alekseev",
+    "email": "nettrash@nettrash.me"
+  },
+  "homepage": "https://nettrash.me",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nettrash/md.vscode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nettrash/md.vscode/issues"
+  },
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#2B221C",
+    "theme": "dark"
+  },
+  "categories": [
+    "Programming Languages",
+    "Visualization",
+    "Formatters"
+  ],
+  "keywords": [
+    "markdown",
+    "katex",
+    "mermaid",
+    "plantuml",
+    "graphviz"
+  ],
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "main": "./dist/extension.js",
+  "contributes": {
+    "markdown.markdownItPlugins": true,
+    "markdown.previewScripts": [
+      "./media/preview/md-preview.js"
+    ],
+    "markdown.previewStyles": [
+      "./media/preview/md-preview.css",
+      "./media/rich/katex.min.css"
+    ],
+    "languages": [
+      {
+        "id": "plantuml",
+        "aliases": [
+          "PlantUML",
+          "plantuml"
+        ],
+        "extensions": [
+          ".puml",
+          ".plantuml",
+          ".iuml",
+          ".pu"
+        ],
+        "configuration": "./language/plantuml.language-configuration.json"
+      },
+      {
+        "id": "graphviz",
+        "aliases": [
+          "Graphviz",
+          "DOT",
+          "graphviz"
+        ],
+        "extensions": [
+          ".gv",
+          ".dot"
+        ],
+        "configuration": "./language/graphviz.language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "plantuml",
+        "scopeName": "source.plantuml",
+        "path": "./language/plantuml.tmLanguage.json"
+      },
+      {
+        "language": "graphviz",
+        "scopeName": "source.graphviz",
+        "path": "./language/graphviz.tmLanguage.json"
+      },
+      {
+        "scopeName": "markdown.md.codeblock",
+        "path": "./language/markdown-md-codeblock.tmLanguage.json",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.plantuml": "plantuml",
+          "meta.embedded.block.graphviz": "graphviz",
+          "meta.embedded.block.mermaid": "mermaid",
+          "meta.embedded.block.latex": "latex"
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "md.exportHtml",
+        "title": "Export as HTML…",
+        "category": "md"
+      },
+      {
+        "command": "md.exportPdf",
+        "title": "Export as PDF…",
+        "category": "md"
+      },
+      {
+        "command": "md.exportEpub",
+        "title": "Export as EPUB…",
+        "category": "md"
+      },
+      {
+        "command": "md.exportLatex",
+        "title": "Export as LaTeX…",
+        "category": "md"
+      },
+      {
+        "command": "md.exportSvg",
+        "title": "Export Diagram as SVG…",
+        "category": "md"
+      },
+      {
+        "command": "md.showDiagramPreview",
+        "title": "Preview Diagram",
+        "category": "md"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "md.exportHtml",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "md.exportPdf",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "md.exportEpub",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "md.exportLatex",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "md.exportSvg",
+          "when": "editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz"
+        },
+        {
+          "command": "md.showDiagramPreview",
+          "when": "editorLangId == plantuml || editorLangId == graphviz"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "md.showDiagramPreview",
+          "when": "editorLangId == plantuml || editorLangId == graphviz",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "md",
+      "properties": {
+        "md.preview.theme": {
+          "type": "string",
+          "enum": [
+            "paper",
+            "editor"
+          ],
+          "enumDescriptions": [
+            "md's own typewriter palette — fresh paper in a light theme, carbon paper in a dark one. Matches the iOS, macOS and Android apps.",
+            "Follow the colours of the current VS Code colour theme."
+          ],
+          "default": "paper",
+          "description": "Which palette the preview draws in.",
+          "scope": "resource"
+        },
+        "md.preview.bodyFont": {
+          "type": "string",
+          "default": "\"American Typewriter\", Georgia, \"Times New Roman\", serif",
+          "markdownDescription": "Font stack for preview prose. The default names American Typewriter first — the apps' face, present on macOS — then falls back to Georgia, which is what the Android app uses where American Typewriter does not exist.",
+          "scope": "resource"
+        },
+        "md.preview.codeFont": {
+          "type": "string",
+          "default": "\"Courier New\", ui-monospace, monospace",
+          "description": "Font stack for code blocks and inline code in the preview.",
+          "scope": "resource"
+        },
+        "md.math.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Typeset `$…$`, `$$…$$` and ` ```math ` blocks with KaTeX, including `\\ce{…}` chemistry via mhchem.",
+          "scope": "resource"
+        },
+        "md.diagrams.mermaid": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Render ` ```mermaid ` blocks.",
+          "scope": "resource"
+        },
+        "md.diagrams.graphviz": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Render ` ```dot `, ` ```graphviz `, ` ```gv ` and the layout-named fences (`neato`, `circo`, `fdp`, `sfdp`, `twopi`, `osage`, `patchwork`).",
+          "scope": "resource"
+        },
+        "md.diagrams.plantuml": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Render ` ```plantuml ` and ` ```puml ` blocks.",
+          "scope": "resource"
+        },
+        "md.highlight.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Syntax-highlight fenced code blocks that name a language.",
+          "scope": "resource"
+        },
+        "md.export.pageSize": {
+          "type": "string",
+          "enum": [
+            "A4",
+            "A5",
+            "Letter",
+            "Legal",
+            "6x9",
+            "5x8",
+            "5.5x8.5"
+          ],
+          "default": "A4",
+          "description": "Page size for PDF export and print, including the print-on-demand trim sizes.",
+          "scope": "resource"
+        }
+      }
+    }
+  },
+  "activationEvents": [
+    "onLanguage:markdown",
+    "onLanguage:plantuml",
+    "onLanguage:graphviz"
+  ],
+  "scripts": {
+    "compile": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "package": "npm run typecheck && npm run test && npm run compile && vsce package",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^22.10.2",
+    "@types/vscode": "^1.95.0",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,299 @@
+{
+  "information_for_contributors": [
+    "A modest PlantUML grammar: enough to read a diagram at a glance, not an",
+    "attempt to parse a language that has no published grammar and roughly",
+    "thirty dialects behind @startuml, @startmindmap, @startgantt, @startsalt …",
+    "",
+    "Three things are worth knowing before editing it.",
+    "",
+    "1. TextMate resolves overlaps by LEFTMOST match, and only breaks ties by",
+    "   the order patterns are listed. So `\"a -> b\"` highlights as a string —",
+    "   the quote is at a lower index than the arrow — no matter where the two",
+    "   rules sit in the list below. The order in `patterns` is therefore",
+    "   readability first, with ties (all the line-anchored rules start at the",
+    "   same index) arranged most specific to most general.",
+    "",
+    "2. The apostrophe comment is anchored to the start of a line. PlantUML's",
+    "   documentation says a `'` begins a comment, and every other PlantUML",
+    "   grammar takes that literally with `'.*$` — which then eats the rest of",
+    "   `Alice -> Bob : don't panic` and paints half the file as a comment.",
+    "   Anchoring costs a trailing-comment idiom nobody uses and buys back every",
+    "   English contraction in every label.",
+    "",
+    "3. Most keyword rules are anchored to the start of a line too, and the ones",
+    "   that are not have had the English-looking words taken out of them. Every",
+    "   PlantUML keyword except `as`, `is`, `then`, `extends` and `implements`",
+    "   heads a statement, whereas the busiest line in any sequence diagram is",
+    "   `Alice -> Bob : some ordinary prose` — and that prose is full of words",
+    "   like `file`, `state`, `node`, `left` and `over`. Unanchored keywords",
+    "   turn every message into a light show. Where prose can be identified —",
+    "   a note body, a title, an activity action — it is captured as a string,",
+    "   which also stops anything inside it being matched further.",
+    "",
+    "There is deliberately no `$schema` key: it makes VS Code fetch a schema",
+    "over the network when this file is opened, and this family's whole point",
+    "is that nothing reaches for the network.",
+    "",
+    "The scope name must stay `source.plantuml` — package.json's `grammars`",
+    "entry and the fenced-block injection both name it."
+  ],
+  "name": "PlantUML",
+  "scopeName": "source.plantuml",
+
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#diagram-markers" },
+    { "include": "#preprocessor" },
+    { "include": "#notes" },
+    { "include": "#captions" },
+    { "include": "#activity" },
+    { "include": "#declarations" },
+    { "include": "#strings" },
+    { "include": "#stereotypes" },
+    { "include": "#arrows" },
+    { "include": "#colours" },
+    { "include": "#keywords" },
+    { "include": "#variables" },
+    { "include": "#numbers" }
+  ],
+
+  "repository": {
+
+    "comments": {
+      "patterns": [
+        {
+          "comment": "Block comment. Listed before the line comment so that a `/'` opening a block wins over the `'` inside it; in practice they never tie, because the block starts one character earlier.",
+          "name": "comment.block.plantuml",
+          "begin": "/'",
+          "end": "'/",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.begin.plantuml" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.comment.end.plantuml" } }
+        },
+        {
+          "comment": "Line comment — only at the start of a line. See note 2 in the header: an unanchored `'` swallows apostrophes in labels.",
+          "match": "^[ \\t]*('.*)$",
+          "captures": { "1": { "name": "comment.line.apostrophe.plantuml" } }
+        }
+      ]
+    },
+
+    "diagram-markers": {
+      "comment": "@startuml/@enduml and the two dozen sibling pairs (@startmindmap, @startgantt, @startsalt, @startjson, @startwbs, …). Matched by shape rather than from a list, because PlantUML keeps adding them and a stale list silently stops highlighting a new diagram type.",
+      "patterns": [
+        {
+          "match": "^[ \\t]*(@start[a-zA-Z]+)\\b(.*)$",
+          "captures": {
+            "1": { "name": "keyword.control.diagram.begin.plantuml" },
+            "2": { "name": "entity.name.section.plantuml" }
+          }
+        },
+        {
+          "match": "^[ \\t]*(@end[a-zA-Z]+)\\b",
+          "captures": { "1": { "name": "keyword.control.diagram.end.plantuml" } }
+        }
+      ]
+    },
+
+    "preprocessor": {
+      "patterns": [
+        {
+          "comment": "The file-pulling directives get their argument scoped as a string, chiefly so that `!include ../shared.puml` does not light its `..` up as a dotted arrow.",
+          "match": "(?i)^[ \\t]*(!)(include(?:sub|url|def)?|import|theme)\\b(.*)$",
+          "captures": {
+            "1": { "name": "punctuation.definition.keyword.plantuml" },
+            "2": { "name": "keyword.control.preprocessor.plantuml" },
+            "3": { "name": "string.unquoted.include.plantuml" }
+          }
+        },
+        {
+          "comment": "Everything else the preprocessor understands: !define, !if, !endif, !procedure, !function, !pragma, !$var = …",
+          "match": "(?i)^[ \\t]*(!)(\\$?[a-z_][a-z0-9_]*)",
+          "captures": {
+            "1": { "name": "punctuation.definition.keyword.plantuml" },
+            "2": { "name": "keyword.control.preprocessor.plantuml" }
+          }
+        }
+      ]
+    },
+
+    "notes": {
+      "comment": "Notes come in three shapes and only one of them is a block. `note left : text` ends on its own line; `note \"text\" as N1` is a whole declaration; `note over A, B` opens a block that runs to `end note`. The block rule therefore refuses any line carrying a colon or a quotation mark, or it would swallow the rest of the diagram looking for an `end note` that was never going to come.",
+      "patterns": [
+        {
+          "comment": "Single-line form. The target clause (`left of Bob`, `over A, B`) is left unscoped on purpose: it is a capture, so nothing inside it can be matched further, and painting `right` as a keyword there would be noise.",
+          "match": "(?i)^[ \\t]*((?:h|r)?note)\\b([^:\"\\n]*)(:)(.*)$",
+          "captures": {
+            "1": { "name": "keyword.other.note.plantuml" },
+            "3": { "name": "punctuation.separator.note.plantuml" },
+            "4": { "name": "string.unquoted.note.plantuml" }
+          }
+        },
+        {
+          "comment": "Multi-line form. The body is scoped as a string so that the extent of the note is visible at a glance — which is most of the reason to highlight a note at all.",
+          "name": "meta.note.plantuml",
+          "begin": "(?i)^[ \\t]*((?:h|r)?note)\\b(?=[^:\"\\n]*$)",
+          "beginCaptures": { "1": { "name": "keyword.other.note.plantuml" } },
+          "end": "(?i)^[ \\t]*(end[ \\t]*note)\\b",
+          "endCaptures": { "1": { "name": "keyword.other.note.plantuml" } },
+          "contentName": "string.unquoted.note.plantuml"
+        }
+      ]
+    },
+
+    "captions": {
+      "comment": "title / header / footer / caption / legend, each written either inline or as a block closed by `end <keyword>`. Capturing the text as a string is not decoration: without it a title such as `Left to right — the fork` lights up `left`, `right` and `fork` as keywords.",
+      "patterns": [
+        {
+          "comment": "Block form: the keyword, an optional position, and nothing else on the line.",
+          "name": "meta.caption.plantuml",
+          "begin": "(?i)^[ \\t]*(title|header|footer|caption|legend)(?:[ \\t]+(top|bottom|left|right|center|centre))?[ \\t]*$",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.caption.plantuml" },
+            "2": { "name": "keyword.other.position.plantuml" }
+          },
+          "end": "(?i)^[ \\t]*(end[ \\t]*(?:title|header|footer|caption|legend))\\b",
+          "endCaptures": { "1": { "name": "keyword.other.caption.plantuml" } },
+          "contentName": "string.unquoted.caption.plantuml"
+        },
+        {
+          "comment": "Inline form. `newpage` joins them here because its optional argument is a title too.",
+          "match": "(?i)^[ \\t]*(title|header|footer|caption|legend|newpage)\\b(.*)$",
+          "captures": {
+            "1": { "name": "keyword.other.caption.plantuml" },
+            "2": { "name": "string.unquoted.caption.plantuml" }
+          }
+        }
+      ]
+    },
+
+    "activity": {
+      "comment": "An activity-diagram action: `:do the thing;`. The body is prose and is scoped as a string for the same reason a note body is. An action always carries a terminator (`;` `|` `<` `>` `]` `}` `/`) — it is required syntax, not a convention — so the block reliably closes.",
+      "name": "meta.activity.plantuml",
+      "begin": "^[ \\t]*(:)",
+      "beginCaptures": { "1": { "name": "punctuation.definition.activity.begin.plantuml" } },
+      "end": "([;|<>\\]}/])[ \\t]*$",
+      "endCaptures": { "1": { "name": "punctuation.definition.activity.end.plantuml" } },
+      "contentName": "string.unquoted.activity.plantuml"
+    },
+
+    "declarations": {
+      "comment": "A declaration at the head of a line, so that the thing being named reads as a name. The full noun list is safe here precisely because it is anchored — a message line never begins with `file` or `state`. A quoted name (`participant \"Long Name\" as B`) is left to the string rule: capture 3 simply does not match, the rule stops after the keyword, and the scanner picks the string up one character later.",
+      "match": "(?i)^[ \\t]*(?:(abstract|static)[ \\t]+)?(class|interface|enum|entity|annotation|struct|protocol|exception|object|usecase|component|participant|actor|boundary|control|database|collections|queue|node|folder|frame|cloud|artifact|card|file|package|namespace|state|rectangle|storage|agent|stack|person|hexagon|circle)\\b[ \\t]*([A-Za-z_][A-Za-z0-9_.]*)?",
+      "captures": {
+        "1": { "name": "storage.modifier.plantuml" },
+        "2": { "name": "storage.type.plantuml" },
+        "3": { "name": "entity.name.type.plantuml" }
+      }
+    },
+
+    "strings": {
+      "patterns": [
+        {
+          "comment": "Ends at the closing quote or, failing that, at the end of the line: PlantUML strings are single-line (a line break inside one is written `\\n`), and an unterminated quote must not paint the remainder of the file.",
+          "name": "string.quoted.double.plantuml",
+          "begin": "\"",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.plantuml" } },
+          "end": "(\")|(?=$)",
+          "endCaptures": { "1": { "name": "punctuation.definition.string.end.plantuml" } },
+          "patterns": [
+            { "match": "\\\\.", "name": "constant.character.escape.plantuml" }
+          ]
+        }
+      ]
+    },
+
+    "stereotypes": {
+      "comment": "`<<interface>>`, `<<(A,#FF7700)>>`. The negative lookahead keeps this off the sequence-diagram arrow `A <<-- B`, whose `<<` is followed by line characters rather than by a stereotype name.",
+      "match": "(<<)(?![-.=~])([^<>\\n]+)(>>)",
+      "captures": {
+        "1": { "name": "punctuation.definition.stereotype.begin.plantuml" },
+        "2": { "name": "entity.name.type.stereotype.plantuml" },
+        "3": { "name": "punctuation.definition.stereotype.end.plantuml" }
+      }
+    },
+
+    "arrows": {
+      "comment": [
+        "The relation operator, in four alternatives. Read them as: (1) something",
+        "decorated on the left — `<|--`, `*--`, `o--`, `}o--`; (2) something",
+        "decorated on the right — `-->`, `..|>`, `--*`, `->>`; (3) an undecorated",
+        "line carrying a modifier or a direction — `-[#red]-`, `-down-`; (4) a",
+        "plain run of two or more line characters — `--`, `..`, `==`.",
+        "",
+        "At least one of those conditions must hold, which is what keeps the rule",
+        "off ordinary hyphens: a single `-` with nothing attached is not an arrow.",
+        "",
+        "`o` and `x` are arrowheads (`A o-- B`, `A ->x B`) and also perfectly",
+        "ordinary letters, so each carries a word-boundary guard. Without the",
+        "lookbehind, the `x-` of a node named `box-1` reads as a lost-message",
+        "arrow. The `>` and `|` heads need no such guard, which matters because",
+        "`A -->Bob` is legal and must not be broken by one.",
+        "",
+        "The `\\` and `/` half-arrows (`A -\\ B`, `A //-- B`) are deliberately",
+        "absent: `//` also opens creole italics, and mistaking emphasis for an",
+        "arrow is worse than missing a rare arrow.",
+        "",
+        "A colour modifier written inside an arrow (`-[#red]->`) is swallowed by",
+        "the arrow scope rather than picked out as a colour. That is the price of",
+        "matching the operator as one token, and one token is what it is.",
+        "",
+        "Each decoration slot repeats up to twice, which is what entity-relation",
+        "diagrams need: crow's-foot notation stacks two of them a side, as in",
+        "`}o--||` and `}|--|{`."
+      ],
+      "name": "keyword.operator.arrow.plantuml",
+      "match": "(?:<{1,2}\\|?|\\|{1,2}|[*+^\\#{}]|(?<!\\w)[ox]){1,2}[-.=~]+(?:\\[[^\\]\\n]*\\])?(?i:up|down|left|right)?[-.=~]*(?:\\|?>{1,2}|<{1,2}\\|?|\\|{1,2}|[*+^\\#{}]|[ox](?!\\w)){0,2}|[-.=~]+(?:\\[[^\\]\\n]*\\])?(?i:up|down|left|right)?[-.=~]*(?:\\|?>{1,2}|<{1,2}\\|?|\\|{1,2}|[*+^\\#{}]|[ox](?!\\w)){1,2}|[-.=~]+(?:\\[[^\\]\\n]*\\]|(?i:up|down|left|right))[-.=~]+|[-.=~]{2,}"
+    },
+
+    "colours": {
+      "patterns": [
+        {
+          "comment": "#RGB, #RGBA, #RRGGBB, #AARRGGBB. Longest alternative first, so `#AABBCC` is one colour and not `#AAB` followed by rubble.",
+          "name": "constant.other.color.plantuml",
+          "match": "(?i)\\#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{4}|[0-9a-f]{3})\\b"
+        },
+        {
+          "comment": "A named colour, but only where a name can only be a colour — after `[`, `,`, `:` or `=`. A bare `#name` is left alone on purpose: inside a class body `#field` means a protected member, and painting every protected member as a colour would be wrong more often than it is right.",
+          "name": "constant.other.color.plantuml",
+          "match": "(?i)(?<=[\\[,:=])\\#[a-z][a-z_]*\\b"
+        }
+      ]
+    },
+
+    "keywords": {
+      "patterns": [
+        {
+          "comment": "Flow control. Anchored: every one of these words heads a statement, and every one of them is also ordinary English that turns up in message text.",
+          "name": "keyword.control.plantuml",
+          "match": "(?i)^[ \\t]*(again|also|alt|backward|break|case|critical|detach|else|elseif|end|endif|endswitch|endwhile|fork|forward|group|if|kill|loop|merge|opt|par|partition|ref|repeat|return|split|start|stop|switch|swimlane|while)\\b"
+        },
+        {
+          "comment": "Directives. Anchored for the same reason.",
+          "name": "keyword.other.plantuml",
+          "match": "(?i)^[ \\t]*(activate|allow_mixing|allowmixing|autonumber|box|create|deactivate|destroy|endstyle|footbox|hide|link|mainframe|order|page|remove|restore|rotate|scale|show|skin|skinparam|sprite|style|together)\\b"
+        },
+        {
+          "comment": "The five words that genuinely occur mid-line, in `Alice as A`, `Foo extends Bar`, `if (x) then (yes)`.",
+          "name": "keyword.operator.word.plantuml",
+          "match": "(?i)\\b(as|extends|implements|is|then)\\b"
+        },
+        {
+          "comment": "The declaration nouns, unanchored so that `Foo <|-- class Bar` still reads. Trimmed to the eight that are never mistaken for prose — `file`, `node`, `state`, `card`, `control` and the rest of the list stay in `declarations`, where the line anchor protects them.",
+          "name": "storage.type.plantuml",
+          "match": "(?i)\\b(abstract|annotation|class|enum|interface|namespace|package|usecase)\\b"
+        }
+      ]
+    },
+
+    "variables": {
+      "comment": "Preprocessor variables, `$name`, and sprite references such as `<$aws>`.",
+      "name": "variable.other.plantuml",
+      "match": "(?i)\\$[a-z_][a-z0-9_]*"
+    },
+
+    "numbers": {
+      "name": "constant.numeric.plantuml",
+      "match": "\\b\\d+(?:\\.\\d+)?\\b"
+    }
+  }
+}

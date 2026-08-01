@@ -1,0 +1,88 @@
+# .vscodeignore — what `vsce package` leaves OUT of the .vsix.
+#
+# This file has no sibling to copy from: the three apps ship through Xcode
+# and Gradle, which decide what goes into a bundle from the project file.
+# Here the rule is inverted — everything in the working tree ships unless
+# it is named below — so a missing line means a 60 MB VSIX full of
+# `node_modules`, and an over-eager line means an extension that installs
+# and then cannot find its own engines. Every exclusion therefore carries
+# its reason, in the habit of the Android repo's .gitignore.
+#
+# What must survive this file, and why:
+#   dist/**       the two esbuild bundles — the extension host entry point
+#                 named by package.json `main`.
+#   media/**      the icon, the preview script and stylesheet, and the
+#                 whole of `media/rich/` — the vendored engines are read
+#                 from disk at run time, so every byte of them must ship.
+#   language/**   grammars and language configurations, referenced from
+#                 package.json `contributes` by path.
+#   package.json, README.md, CHANGELOG.md, LICENSE, PRIVACY.md
+# Verify after any change with `npx vsce ls`, which prints the exact
+# manifest the .vsix will carry.
+
+# TypeScript sources. Everything a user runs is bundled into dist/, so
+# shipping src/ would double the package and ship it twice over.
+src/**
+**/*.ts
+
+# Tests, fixtures and golden files. They are the proof the renderer is
+# byte-identical to the apps, not something an installed extension needs.
+test/**
+fixtures/**
+
+# Source maps. They only serve a debugger attached to this working tree,
+# and dist/extension.js.map alone is larger than the code it maps.
+**/*.map
+
+# Development dependencies. There are no runtime ones — package.json has
+# no `dependencies` block at all — so the whole tree can go.
+node_modules/**
+package-lock.json
+
+# Build configuration. The .vsix is already built by the time it matters.
+tsconfig.json
+esbuild.mjs
+vitest.config.*
+.editorconfig
+.eslintrc*
+eslint.config.*
+
+# Repository plumbing, meaningful on GitHub and nowhere else.
+.github/**
+.gitignore
+.gitattributes
+CODEOWNERS
+
+# Marketplace listing copy. It is the *source* of the listing, kept beside
+# the code it describes; shipping it inside the artefact it describes
+# would be circular.
+marketplace/**
+
+# The port specifications. They belong to the repository's history, not to
+# a user's extensions folder, and they are larger than the extension.
+specs/**
+
+# Editor and test-runner scratch. `.vscode/` is tracked in git on purpose
+# (it is how a contributor launches an Extension Development Host) but an
+# installed extension has no use for a launch configuration.
+.vscode/**
+.vscode-test/**
+.vscode-test.*
+
+# A previously packaged build, so a .vsix never ends up inside a .vsix.
+*.vsix
+
+# Deliberately NOT excluded, though both are tempting:
+#   media/rich/fonts/*.woff and *.ttf — every VS Code webview is Chromium
+#     and takes the woff2 that each @font-face lists first, so the older
+#     two formats are ~940 KB of dead weight here. They stay because the
+#     vendored tree is byte-identical in all four repos and trimming it
+#     for one platform is a family decision, not a packaging one.
+#   media/rich/plantuml.js — 7 MB, and the single largest file in the
+#     package. There is no smaller build: it has no npm distribution and
+#     is vendored verbatim.
+
+# Local scratch.
+.DS_Store
+.claude/**
+CLAUDE.md

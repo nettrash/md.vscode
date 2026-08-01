@@ -1,0 +1,294 @@
+{
+  "information_for_contributors": [
+    "Fenced-code injection: gives the fences md renders specially their own",
+    "language inside a Markdown document. Injected into `text.html.markdown`",
+    "by package.json, which also maps four of the `meta.embedded.block.*`",
+    "scopes below onto real language ids.",
+    "",
+    "The shape of each rule is copied deliberately from VS Code's own",
+    "markdown-basics grammar (`fenced_code_block_css` and friends), down to the",
+    "`((\\s+|:|,|\\{|\\?)[^`]*)?$` tail on the info string and the",
+    "`(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$` closing fence. Two reasons:",
+    "",
+    "  * a ```plantuml fence should look exactly like a ```css fence — same",
+    "    punctuation colour, same language-name colour, same block scope — and",
+    "    the only way to guarantee that is to emit the same scopes;",
+    "",
+    "  * the closing-fence rule is stricter than md's parser, which accepts any",
+    "    indentation and any fence at least as long as the opener (port spec §5,",
+    "    rule 25). That difference is on purpose. The grammar only paints; the",
+    "    renderer decides. Matching VS Code here means a fence that looks odd in",
+    "    the editor looks odd for the same reason every other fence would, and",
+    "    nobody has to learn a second rule.",
+    "",
+    "The inner `\"begin\": \"(^|\\\\G)(\\\\s*)(.*)\"` is not a typo and does not",
+    "swallow the first line: by the time it is tried, the scanner sits at the",
+    "end of the fence line, so `\\G` anchors there and `(.*)` matches the empty",
+    "remainder. It is a zero-width anchor that hands the following lines to the",
+    "embedded grammar. Same trick as markdown-basics.",
+    "",
+    "WHAT IS AND IS NOT HERE",
+    "",
+    "  * ```latex and ```tex are md math fences too, but markdown-basics",
+    "    already injects `text.tex.latex` for both, so only ```math is added.",
+    "    Adding the other two would mean two grammars racing for the same fence",
+    "    to no benefit.",
+    "",
+    "  * ```mermaid asks for `source.mermaid`, which nothing in a stock VS Code",
+    "    provides — the built-in mermaid extension ships a renderer, not a",
+    "    grammar. Same for ```math and `text.tex.latex`, which comes from the",
+    "    built-in LaTeX extension and can be turned off.",
+    "",
+    "    Both therefore carry a second, local pattern beside the include, and",
+    "    that is NOT belt and braces. Measured against vscode-textmate 9 with",
+    "    real Oniguruma: when an include naming a grammar that is not installed",
+    "    is the ONLY pattern of a rule, the rule itself is discarded — not just",
+    "    the include. The fence then falls through to markdown-basics' unknown-",
+    "    fence rule and the body loses `meta.embedded.block.mermaid` entirely.",
+    "    One resolvable sibling pattern keeps the rule alive; the same test",
+    "    confirms the external grammar still wins every tie when it is present,",
+    "    because an include contributes its patterns ahead of whatever follows",
+    "    it. So the local rules are a floor, not a competitor: a couple of",
+    "    lines of highlighting when nothing better is installed, and invisible",
+    "    when something is.",
+    "",
+    "  * ```csv and ```tsv have no language to embed anywhere, so they are given",
+    "    a handful of local rules instead. Highlighting numeric cells is not",
+    "    decoration: md right-aligns exactly those cells in the rendered table",
+    "    (`isDecimalNumber`), so the colour is a preview of the alignment.",
+    "",
+    "  * The ten Graphviz aliases are the ten keys of `graphvizEngines`",
+    "    (port spec §4 of the HTML-emit spec) and must stay in step with it: a",
+    "    fence that renders as a diagram but highlights as prose, or the other",
+    "    way round, is exactly the kind of small lie that costs an afternoon.",
+    "",
+    "There is deliberately no `$schema` key: it makes VS Code fetch a schema",
+    "over the network when this file is opened.",
+    "",
+    "The scope name must stay `markdown.md.codeblock` — package.json names it."
+  ],
+  "scopeName": "markdown.md.codeblock",
+  "injectionSelector": "L:text.html.markdown",
+  "fileTypes": [],
+
+  "patterns": [
+    { "include": "#md-fenced-plantuml" },
+    { "include": "#md-fenced-graphviz" },
+    { "include": "#md-fenced-mermaid" },
+    { "include": "#md-fenced-math" },
+    { "include": "#md-fenced-csv" },
+    { "include": "#md-fenced-tsv" }
+  ],
+
+  "repository": {
+
+    "md-fenced-plantuml": {
+      "comment": "`plant-uml` is listed first only for readability; Oniguruma backtracks, so alternation order cannot change which alias matches. All three are the aliases md's own code-block dispatch accepts.",
+      "name": "markup.fenced_code.block.markdown",
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(plant-uml|plantuml|puml)((\\s+|:|,|\\{|\\?)[^`]*)?$)",
+      "beginCaptures": {
+        "3": { "name": "punctuation.definition.markdown" },
+        "4": { "name": "fenced_code.block.language.markdown" },
+        "5": { "name": "fenced_code.block.language.attributes.markdown" }
+      },
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "endCaptures": {
+        "3": { "name": "punctuation.definition.markdown" }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.plantuml",
+          "patterns": [{ "include": "source.plantuml" }]
+        }
+      ]
+    },
+
+    "md-fenced-graphviz": {
+      "comment": "The ten `graphvizEngines` keys. `dot` and `gv` and `graphviz` all mean the dot layout; the other seven name a layout engine directly, the way Graphviz itself is invoked.",
+      "name": "markup.fenced_code.block.markdown",
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(graphviz|patchwork|neato|circo|twopi|osage|sfdp|fdp|dot|gv)((\\s+|:|,|\\{|\\?)[^`]*)?$)",
+      "beginCaptures": {
+        "3": { "name": "punctuation.definition.markdown" },
+        "4": { "name": "fenced_code.block.language.markdown" },
+        "5": { "name": "fenced_code.block.language.attributes.markdown" }
+      },
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "endCaptures": {
+        "3": { "name": "punctuation.definition.markdown" }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.graphviz",
+          "patterns": [{ "include": "source.graphviz" }]
+        }
+      ]
+    },
+
+    "md-fenced-mermaid": {
+      "comment": "See the header: `source.mermaid` may not exist, and `#mermaid-minimal` beside it is what keeps the rule — and therefore the embedded scope — alive when it does not.",
+      "name": "markup.fenced_code.block.markdown",
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(mermaid)((\\s+|:|,|\\{|\\?)[^`]*)?$)",
+      "beginCaptures": {
+        "3": { "name": "punctuation.definition.markdown" },
+        "4": { "name": "fenced_code.block.language.markdown" },
+        "5": { "name": "fenced_code.block.language.attributes.markdown" }
+      },
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "endCaptures": {
+        "3": { "name": "punctuation.definition.markdown" }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.mermaid",
+          "patterns": [
+            { "include": "source.mermaid" },
+            { "include": "#mermaid-minimal" }
+          ]
+        }
+      ]
+    },
+
+    "md-fenced-math": {
+      "comment": "md renders ```math, ```latex and ```tex identically, as one display formula. Only ```math is claimed here — markdown-basics already owns the other two, with the same `meta.embedded.block.latex` scope, so the three end up looking alike anyway.",
+      "name": "markup.fenced_code.block.markdown",
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(math)((\\s+|:|,|\\{|\\?)[^`]*)?$)",
+      "beginCaptures": {
+        "3": { "name": "punctuation.definition.markdown" },
+        "4": { "name": "fenced_code.block.language.markdown" },
+        "5": { "name": "fenced_code.block.language.attributes.markdown" }
+      },
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "endCaptures": {
+        "3": { "name": "punctuation.definition.markdown" }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.latex",
+          "patterns": [
+            { "include": "text.tex.latex" },
+            { "include": "#latex-minimal" }
+          ]
+        }
+      ]
+    },
+
+    "md-fenced-csv": {
+      "name": "markup.fenced_code.block.markdown",
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(csv)((\\s+|:|,|\\{|\\?)[^`]*)?$)",
+      "beginCaptures": {
+        "3": { "name": "punctuation.definition.markdown" },
+        "4": { "name": "fenced_code.block.language.markdown" },
+        "5": { "name": "fenced_code.block.language.attributes.markdown" }
+      },
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "endCaptures": {
+        "3": { "name": "punctuation.definition.markdown" }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.csv",
+          "patterns": [{ "include": "#delimited-common" }, { "include": "#csv-cells" }]
+        }
+      ]
+    },
+
+    "md-fenced-tsv": {
+      "name": "markup.fenced_code.block.markdown",
+      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(tsv)((\\s+|:|,|\\{|\\?)[^`]*)?$)",
+      "beginCaptures": {
+        "3": { "name": "punctuation.definition.markdown" },
+        "4": { "name": "fenced_code.block.language.markdown" },
+        "5": { "name": "fenced_code.block.language.attributes.markdown" }
+      },
+      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "endCaptures": {
+        "3": { "name": "punctuation.definition.markdown" }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "contentName": "meta.embedded.block.tsv",
+          "patterns": [{ "include": "#delimited-common" }, { "include": "#tsv-cells" }]
+        }
+      ]
+    },
+
+    "mermaid-minimal": {
+      "comment": "The floor described in the header. Two rules, both of which a real Mermaid grammar would also cover — and would win, since it is included first.",
+      "patterns": [
+        {
+          "comment": "Mermaid's comment, and its `%%{init: …}%%` directive, which reads as a comment here.",
+          "name": "comment.line.percentage.mermaid",
+          "match": "%%.*$"
+        },
+        {
+          "name": "string.quoted.double.mermaid",
+          "begin": "\"",
+          "end": "(\")|(?=$)",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.mermaid" } },
+          "endCaptures": { "1": { "name": "punctuation.definition.string.end.mermaid" } }
+        }
+      ]
+    },
+
+    "latex-minimal": {
+      "comment": "The same floor for ```math. The scopes are the ones the real LaTeX grammar uses for the same things, so on the rare tie this rule wins the colour is still right.",
+      "patterns": [
+        { "name": "comment.line.percentage.tex", "match": "(?<!\\\\)%.*$" },
+        { "name": "support.function.general.tex", "match": "\\\\[A-Za-z@]+" },
+        { "name": "constant.character.escape.tex", "match": "\\\\." }
+      ]
+    },
+
+    "delimited-common": {
+      "comment": "The quoted-field form of RFC 4180, shared by both fences. A doubled quote is the escape, which is why the closing quote carries `(?!\\\")` — otherwise `\"\"\"a\"\"\"` closes on the wrong one. md's own `parseDelimited` reads the field exactly this way.",
+      "patterns": [
+        {
+          "name": "string.quoted.double.delimited",
+          "begin": "\"",
+          "end": "\"(?!\")",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.delimited" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.delimited" } },
+          "patterns": [
+            { "match": "\"\"", "name": "constant.character.escape.delimited" }
+          ]
+        }
+      ]
+    },
+
+    "csv-cells": {
+      "patterns": [
+        {
+          "comment": "A whole cell that is a decimal number — the cells md right-aligns. The lookbehind says `nothing, or a comma, immediately before`: `(?<![^,])` is fixed width and so is safe in Oniguruma, where `(?<=^|,)` would not be. Only ASCII space and tab may pad the cell, which is narrower than the parser's whitespace set everywhere else and deliberately so (port spec §5, rule 7): a cell padded with U+200B is not a number on any platform.",
+          "name": "constant.numeric.delimited",
+          "match": "(?<![^,])[ \\t]*[-+]?(?:[0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)[ \\t]*(?=,|$)"
+        },
+        {
+          "name": "punctuation.separator.delimited",
+          "match": ","
+        }
+      ]
+    },
+
+    "tsv-cells": {
+      "comment": "Same as `csv-cells`, with the tab as separator. The tab is not scoped: painting an invisible character achieves nothing.",
+      "patterns": [
+        {
+          "name": "constant.numeric.delimited",
+          "match": "(?<![^\\t])[ ]*[-+]?(?:[0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)[ ]*(?=\\t|$)"
+        }
+      ]
+    }
+  }
+}

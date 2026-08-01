@@ -1,0 +1,74 @@
+{
+  "comment": [
+    "Graphviz / DOT editing behaviour — the non-highlighting half of the",
+    "language contribution declared in package.json.",
+    "",
+    "Strict JSON, for the same reason as the PlantUML configuration beside it:",
+    "VS Code would accept `//` comments here, but a file that also survives a",
+    "plain JSON.parse is cheaper to test. The prose lives in this ignored key.",
+    "",
+    "The one decision worth writing down:",
+    "",
+    "  * `<` and `>` are NOT declared as brackets. In DOT they delimit an",
+    "    HTML-like label (`label=<<b>hi</b>>`) and would look like a natural",
+    "    pair — but every edge in the file is spelled `->`, and a bracket pair",
+    "    makes bracket-pair colourisation treat each of those `>` characters as",
+    "    a closer with no opener. A graph of two hundred edges then reads as two",
+    "    hundred bracket errors. They are listed as an auto-closing and a",
+    "    surrounding pair instead, where the `>` of `->` is never involved:",
+    "    auto-closing only fires on a typed `<`, and surrounding only on a",
+    "    selection.",
+    "",
+    "  * `.dot` is claimed by package.json even though the md family's own note",
+    "    (port spec §4.4, F-45) says the extension is deliberately left alone",
+    "    because the operating system already registers it as a Word template.",
+    "    That is a package.json decision, not one this file can make; it is",
+    "    recorded here so the reasoning is not lost.",
+    "",
+    "No wordPattern is set: DOT's ID grammar (`[A-Za-z_][A-Za-z_0-9]*`, plus",
+    "numerals) is already exactly VS Code's default word class, so overriding it",
+    "would only introduce a way to be wrong."
+  ],
+
+  "comments": {
+    "lineComment": "//",
+    "blockComment": ["/*", "*/"]
+  },
+
+  "brackets": [
+    ["{", "}"],
+    ["[", "]"]
+  ],
+
+  "autoClosingPairs": [
+    { "open": "{", "close": "}" },
+    { "open": "[", "close": "]" },
+    { "open": "\"", "close": "\"", "notIn": ["string", "comment"] },
+    { "open": "<", "close": ">", "notIn": ["string", "comment"] },
+    { "open": "/*", "close": "*/", "notIn": ["string", "comment"] }
+  ],
+
+  "surroundingPairs": [
+    ["{", "}"],
+    ["[", "]"],
+    ["<", ">"],
+    ["\"", "\""]
+  ],
+
+  "colorizedBracketPairs": [
+    ["{", "}"],
+    ["[", "]"]
+  ],
+
+  "folding": {
+    "markers": {
+      "start": "^\\s*//\\s*#?region\\b",
+      "end": "^\\s*//\\s*#?endregion\\b"
+    }
+  },
+
+  "indentationRules": {
+    "increaseIndentPattern": "(^.*\\{[^}]*$)",
+    "decreaseIndentPattern": "^\\s*\\}"
+  }
+}

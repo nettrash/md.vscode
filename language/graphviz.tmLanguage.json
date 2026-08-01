@@ -1,0 +1,200 @@
+{
+  "information_for_contributors": [
+    "Graphviz / DOT. Small language, published grammar, so this one can afford",
+    "to be fairly literal about it — see the DOT language definition at",
+    "https://graphviz.org/doc/info/lang.html.",
+    "",
+    "Three decisions carry their reasons here.",
+    "",
+    "1. `<` always opens an HTML-like label. DOT has no comparison operators and",
+    "   no generics, so outside a quoted string the only thing an angle bracket",
+    "   can be is the start of `label=<<b>bold</b>>`. That is why the rule needs",
+    "   no `(?<==)` guard, which is fortunate: Oniguruma would not take a",
+    "   variable-length one. Inside the label the built-in HTML grammar is",
+    "   included, and it is what makes the naive `<` … `>` pair work at all —",
+    "   HTML consumes `<b>` including its `>`, so the end pattern is only",
+    "   reached at the `>` that closes the label. The known cost is a bare",
+    "   greater-than in label text (`<a > b>`), which ends the label early.",
+    "",
+    "2. `#` is a comment only at the start of a line, because that is all DOT",
+    "   promises: a `#` line is C-preprocessor output. The md renderer's",
+    "   `isRawGraphviz` refuses to skip those lines for a related reason — every",
+    "   Markdown heading also starts with `#`, so a `.gv` file that opens with a",
+    "   comment is rendered as Markdown (port spec §5, rule 69). Nothing here",
+    "   can fix that; it is recorded so the two behaviours are not read as a",
+    "   contradiction.",
+    "",
+    "3. Identifiers accept letters, marks and numbers rather than plain `\\w`.",
+    "   Rule 70 of the port spec is the story: a name in NFD such as",
+    "   `digraph café {` ended early when the name run did not accept combining",
+    "   marks, and the file then rendered as Markdown on VS Code alone.",
+    "",
+    "There is deliberately no `$schema` key: it makes VS Code fetch a schema",
+    "over the network when this file is opened.",
+    "",
+    "The scope name must stay `source.graphviz` — package.json's `grammars`",
+    "entry and the fenced-block injection both name it."
+  ],
+  "name": "Graphviz",
+  "scopeName": "source.graphviz",
+
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#graph-header" },
+    { "include": "#subgraph-header" },
+    { "include": "#default-attribute-statement" },
+    { "include": "#attribute-list" },
+    { "include": "#html-label" },
+    { "include": "#strings" },
+    { "include": "#edge-operator" },
+    { "include": "#attribute" },
+    { "include": "#numbers" },
+    { "include": "#punctuation" }
+  ],
+
+  "repository": {
+
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.graphviz",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.begin.graphviz" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.comment.end.graphviz" } }
+        },
+        {
+          "name": "comment.line.double-slash.graphviz",
+          "match": "//.*$"
+        },
+        {
+          "comment": "See note 2 in the header: only at the start of a line.",
+          "match": "^[ \\t]*(#.*)$",
+          "captures": { "1": { "name": "comment.line.number-sign.graphviz" } }
+        }
+      ]
+    },
+
+    "graph-header": {
+      "comment": "`strict digraph Name {`. The name is optional and may also be a quoted string, in which case capture 3 does not match, the rule stops after the keyword, and the string rule picks it up.",
+      "match": "(?i)\\b(?:(strict)[ \\t]+)?(digraph|graph)\\b[ \\t]*([\\p{L}\\p{M}_][\\p{L}\\p{N}\\p{M}_]*)?",
+      "captures": {
+        "1": { "name": "storage.modifier.graphviz" },
+        "2": { "name": "storage.type.graph.graphviz" },
+        "3": { "name": "entity.name.type.graph.graphviz" }
+      }
+    },
+
+    "subgraph-header": {
+      "comment": "`subgraph cluster_a {`. Kept separate from the graph header only because `strict` may not precede it.",
+      "match": "(?i)\\b(subgraph)\\b[ \\t]*([\\p{L}\\p{M}_][\\p{L}\\p{N}\\p{M}_]*)?",
+      "captures": {
+        "1": { "name": "storage.type.graph.graphviz" },
+        "2": { "name": "entity.name.type.graph.graphviz" }
+      }
+    },
+
+    "default-attribute-statement": {
+      "comment": "`node [shape=box]` / `edge [color=grey]`. The lookahead is what distinguishes the keyword from a node called `node`, which DOT allows and people write.",
+      "name": "storage.type.graphviz",
+      "match": "(?i)\\b(node|edge)\\b(?=[ \\t]*\\[)"
+    },
+
+    "attribute-list": {
+      "name": "meta.attribute-list.graphviz",
+      "begin": "\\[",
+      "end": "\\]",
+      "beginCaptures": { "0": { "name": "punctuation.definition.attribute-list.begin.graphviz" } },
+      "endCaptures": { "0": { "name": "punctuation.definition.attribute-list.end.graphviz" } },
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#html-label" },
+        { "include": "#strings" },
+        { "include": "#attribute" },
+        { "include": "#numbers" },
+        { "match": "[,;]", "name": "punctuation.separator.attribute.graphviz" }
+      ]
+    },
+
+    "html-label": {
+      "comment": "See note 1 in the header. `text.html.basic` comes from VS Code's built-in HTML extension, which the author is allowed to disable — and a missing include that is a rule's ONLY pattern takes the rule down with it, measured against vscode-textmate 9 with real Oniguruma. Without the sibling below, disabling HTML would leave `label=<<b>hi</b>>` with no scopes at all, not merely without HTML ones. When HTML is present it wins every tie, because an include contributes its patterns ahead of what follows it.",
+      "begin": "<",
+      "end": ">",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.graphviz" } },
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.graphviz" } },
+      "contentName": "meta.embedded.block.html",
+      "patterns": [
+        { "include": "text.html.basic" },
+        { "include": "#html-label-minimal" }
+      ]
+    },
+
+    "html-label-minimal": {
+      "comment": "The floor for the HTML label. It matches a whole tag, closing angle bracket included, and that is the point: the `<` … `>` pair above relies on its inner patterns to eat the `>` of every nested tag, so a fallback that stopped at the tag name would end the label at the first `<b>` and spill the rest of the label into the graph.",
+      "patterns": [
+        {
+          "match": "(</?)([A-Za-z][A-Za-z0-9]*)([^<>]*?)(/?>)",
+          "captures": {
+            "1": { "name": "punctuation.definition.tag.begin.html" },
+            "2": { "name": "entity.name.tag.html" },
+            "4": { "name": "punctuation.definition.tag.end.html" }
+          }
+        },
+        {
+          "name": "constant.character.entity.html",
+          "match": "&(?:[A-Za-z][A-Za-z0-9]*|#[0-9]+|#x[0-9A-Fa-f]+);"
+        }
+      ]
+    },
+
+    "strings": {
+      "comment": "DOT strings may span lines — a trailing backslash is the documented line continuation — so this is genuinely multi-line and not clipped at the end of the line the way PlantUML's is.",
+      "name": "string.quoted.double.graphviz",
+      "begin": "\"",
+      "end": "\"",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.graphviz" } },
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.graphviz" } },
+      "patterns": [
+        {
+          "comment": "`\\\"`, `\\\\`, the line continuation, and the label escapes `\\N` `\\G` `\\E` `\\T` `\\H` `\\L` `\\l` `\\r`.",
+          "name": "constant.character.escape.graphviz",
+          "match": "\\\\."
+        }
+      ]
+    },
+
+    "edge-operator": {
+      "comment": "`->` in a digraph, `--` in a graph. Mixing them is an error Graphviz reports; the grammar does not try to, because it has no idea which kind of graph it is in.",
+      "name": "keyword.operator.edge.graphviz",
+      "match": "->|--"
+    },
+
+    "attribute": {
+      "comment": "`shape=box`, and the bare `rankdir=LR;` form that sits at graph level outside any bracket — which is why this rule is not confined to `#attribute-list`.",
+      "match": "([\\p{L}\\p{M}_][\\p{L}\\p{N}\\p{M}_]*)[ \\t]*(=)",
+      "captures": {
+        "1": { "name": "entity.other.attribute-name.graphviz" },
+        "2": { "name": "keyword.operator.assignment.graphviz" }
+      }
+    },
+
+    "numbers": {
+      "name": "constant.numeric.graphviz",
+      "match": "-?(?:\\.[0-9]+|[0-9]+(?:\\.[0-9]*)?)"
+    },
+
+    "punctuation": {
+      "patterns": [
+        { "match": "\\{", "name": "punctuation.section.block.begin.graphviz" },
+        { "match": "\\}", "name": "punctuation.section.block.end.graphviz" },
+        { "match": ";", "name": "punctuation.terminator.statement.graphviz" },
+        { "match": ",", "name": "punctuation.separator.graphviz" },
+        {
+          "comment": "The port separator of `node:port:compass`.",
+          "match": ":",
+          "name": "punctuation.separator.port.graphviz"
+        }
+      ]
+    }
+  }
+}

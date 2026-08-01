@@ -1,0 +1,560 @@
+/* md — the stylesheet for VS Code's built-in Markdown preview.
+   Contributed through `markdown.previewStyles` in package.json, alongside
+   `media/rich/katex.min.css` and after it in the array, which is the order the
+   preview emits the <link> tags in — the same order the apps use, and for the
+   same reason (see §KaTeX below).
+
+   THIS IS NOT THE PARITY STYLESHEET. That one lives in `src/render/css-text.ts`,
+   is byte-identical to `MarkdownHTML.swift`, and goes into the exports we
+   generate ourselves end to end. Here VS Code owns the shell: its own
+   markdown.css and highlight.css are already loaded, the <body> carries VS
+   Code's classes, our markup arrives inside VS Code's <div class="markdown-body">
+   and the user's `markdown.styles` load after everything. Byte-parity is
+   structurally impossible in that shell, so this file goes for *visual* parity
+   instead, and is free to use the things the parity sheet must never contain:
+   custom properties, media queries, `:not()`, and `--vscode-*` colours.
+
+   Do not factor "shared" rules out of the two files into one. The parity sheet
+   acquiring a declaration the apps do not have is exactly the failure this
+   separation exists to prevent, and only a byte diff against the apps catches it.
+
+   ── HOW THIS FILE WINS, AND WHY IT IS WRITTEN THE WAY IT IS ──────────────────
+
+   1. Load order between extensions is NOT guaranteed. The preview concatenates
+      `contributions.previewStyles` from every contributing extension, and the
+      built-in markdown-language-features contributes its own markdown.css and
+      highlight.css the same way. So this sheet never relies on coming later —
+      it wins on **specificity**. Every rule is prefixed with `body` and/or
+      `.markdown-body`, which puts it at (0,1,2) or better and clears the whole
+      of markdown.css, whose heaviest content selector is `pre:not(.hljs)` at
+      (0,1,1) and `table > tbody > tr + tr > td` at (0,0,4).
+
+   2. That prefix is also the containment. Everything the preview injects that
+      is *not* the document — #code-csp-warning, the loading placeholders — sits
+      outside `.markdown-body` and keeps its own styling. Only the page frame
+      (background, ink, the two fonts) is set on <body> itself, because paper
+      that stopped at the content's height would leave VS Code's editor colour
+      showing below the last line.
+
+      `.markdown-body` is the preview's own content wrapper, not a convention we
+      invented: the preview emits `<div class="markdown-body" dir="auto">` around
+      every render and its client script queries that class, so it is structural
+      rather than cosmetic. Should it ever go, this sheet goes inert rather than
+      wrong — which is the failure worth having.
+
+   3. The webview's own defaults sit in `@layer vscode-default` (body background
+      transparent, links in `--vscode-textLink-foreground`, `code` chrome). Any
+      unlayered rule beats a layered one whatever its specificity, so nothing
+      here needs to fight them; they are listed only where the reset is not
+      obvious.
+
+   4. `body` never gets a `margin`. VS Code's `body.scrollBeyondLastLine` adds
+      `margin-bottom: calc(100vh - 22px)` at the same (0,1,1) we would use, and
+      a tie is decided by load order — which point 1 says we do not control. The
+      frame is set with `padding` only, which is what md uses anyway.
+
+   ── THE TWO PALETTES ────────────────────────────────────────────────────────
+
+   Default (`md.preview.theme: "paper"`): md's own typewriter palette, the one
+   the iOS, macOS and Android apps draw — fresh paper in a light theme, carbon
+   paper in a dark one. Colours are the app's literal hex, so a screenshot of
+   the preview and a screenshot of the app show the same page.
+
+   `body[data-md-theme="editor"]` (`md.preview.theme: "editor"`): the same rules,
+   with the seven palette variables remapped onto `--vscode-*`, so the preview
+   follows whatever colour theme the editor is wearing. It changes **colours
+   only** — the fonts and the metrics stay md's, because that is what the
+   setting says it does and because the document's scale is a parity property.
+
+   The extension stamps `data-md-theme` on <body> from the setting; when it is
+   absent the paper palette applies, so a preview that renders before any script
+   runs is already correct.
+
+   ── FONTS ───────────────────────────────────────────────────────────────────
+
+   `--md-body-font` and `--md-code-font` carry the `md.preview.bodyFont` /
+   `md.preview.codeFont` settings. They are declared on `:root` so the extension
+   may set them at runtime on either the root element or <body>: a declaration
+   on a descendant always beats one inherited from an ancestor, and an inline
+   style beats this rule on the same element.
+
+   American Typewriter — the apps' prose face, and the first name in the default
+   stack — exists only on Apple platforms. The app's own fallback is
+   `"Courier New", serif`, which means the entire document, prose included, sets
+   in Courier New on Windows. The Android app faced the same question and
+   answered it with `Georgia, "Times New Roman", serif`; the default in
+   package.json follows Android there, so a Mac shows the app's face and
+   everywhere else shows Android's. Do not add a webfont: the only faces this
+   product embeds anywhere are KaTeX's twenty OFL-licensed `KaTeX_*` files. */
+
+/* ══ 1. Palette and fonts ═══════════════════════════════════════════════════ */
+
+:root {
+	/* Overridable at runtime; see the note above. */
+	--md-body-font: "American Typewriter", Georgia, "Times New Roman", serif;
+	--md-code-font: "Courier New", ui-monospace, monospace;
+
+	/* md's light palette — "fresh paper". Four of these come from the app's
+	   asset catalog (PaperBackground, PaperInk, PaperBackgroundSecondary,
+	   AccentColor); --md-muted, --md-border and --md-code-string exist only in
+	   CSS. --md-border is literally the ink at 16 % alpha. */
+	--md-paper: #F4EFE2;
+	--md-ink: #2B2620;
+	--md-secondary: #EAE2CF;
+	--md-accent: #9C6B2E;
+	--md-muted: #6B635A;
+	--md-border: rgba(43, 38, 32, 0.16);
+	/* A shade drawn from the ink itself — quieter than plain ink but warmer and
+	   darker than the grey --md-muted used for comments, so strings and comments
+	   stay distinct without adding a new hue to the warm-paper palette. */
+	--md-code-string: #4A4034;
+}
+
+/* "Carbon paper". A high-contrast light theme carries *both*
+   `vscode-high-contrast` and `vscode-high-contrast-light` (the webview host
+   adds the former for backwards compatibility), so the dark branch has to
+   exclude it explicitly rather than rely on a later rule to undo it. */
+body.vscode-dark,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) {
+	--md-paper: #241E18;
+	--md-ink: #E7DBC2;
+	--md-secondary: #2F2820;
+	--md-accent: #C99A55;
+	--md-muted: #B3A98E;
+	--md-border: rgba(231, 219, 194, 0.16);
+	--md-code-string: #CDBF9E;
+}
+
+/* Follow the editor's colour theme. Same specificity (0,1,1) as the carbon-paper
+   rule above, so this must stay *after* it: a dark VS Code theme matches both. */
+body[data-md-theme="editor"] {
+	--md-paper: var(--vscode-editor-background);
+	--md-ink: var(--vscode-editor-foreground, var(--vscode-foreground));
+	--md-secondary: var(--vscode-textCodeBlock-background);
+	--md-accent: var(--vscode-textLink-foreground);
+	--md-muted: var(--vscode-descriptionForeground);
+	/* --vscode-widget-border is undefined in a good many themes, hence the
+	   ladder down to the neutral markdown.css uses for its front-matter table. */
+	--md-border: var(--vscode-widget-border, var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.35)));
+	/* No --md-code-string: in this mode the hljs rules below deliberately do not
+	   apply and VS Code's own highlight.css colours the tokens. */
+}
+
+/* High contrast, either polarity and either palette — hence last and unqualified
+   by the theme attribute. HC themes promise a visible edge on every box; a 16 %
+   ink wash does not deliver one, and a table whose grid has vanished is worse
+   than a table that looks unlike the app. */
+body.vscode-high-contrast {
+	--md-border: var(--vscode-contrastBorder, var(--md-ink));
+}
+
+/* ══ 2. The page ════════════════════════════════════════════════════════════ */
+
+/* markdown.css sets font, size, line-height and `padding: 0 26px` on
+   `html, body` at (0,0,1), and `padding-top: 1em` on `body`; this replaces all
+   of it. `13pt` is md's preview body size and the sheet's only absolute one —
+   everything below is em-based and scales off it, which is why
+   `markdown.preview.fontSize` is deliberately not consulted: it would rescale
+   the document away from the apps. A reader who wants a different size can say
+   so in `markdown.styles`, which loads after every previewStyle. */
+body.vscode-body {
+	background: var(--md-paper);
+	color: var(--md-ink);
+	font-family: var(--md-body-font);
+	font-size: 13pt;
+	line-height: 1.55;
+	padding: 48px 56px;
+	-webkit-text-size-adjust: 100%;
+	color-scheme: light;
+}
+
+/* The UA's own light/dark switch, for the scrollbars and form controls of
+   everything inside the document — `pre` and every rich block is a scroll
+   container, and a dark preview with light scrollbars reads as a rendering
+   fault. It follows the *editor's* polarity in both palettes, since that is
+   what the class on <body> reports.
+
+   This has to be a rule of its own, after the frame above: `body.vscode-dark`
+   and `body.vscode-body` are both (0,1,1), a dark preview matches both, and a
+   tie is settled by source order. */
+body.vscode-dark,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) {
+	color-scheme: dark;
+}
+
+/* The preview pane is routinely a third of the window wide, where a 56px frame
+   is a quarter of the measure. The apps never face that, so this is additive
+   and VS Code-only. */
+@media (max-width: 720px) {
+	body.vscode-body {
+		padding: 28px 24px;
+	}
+}
+
+/* md's `* { box-sizing: border-box }`, stopped at our container so it cannot
+   reach VS Code's own chrome. Proven safe over KaTeX and the diagram SVGs by
+   three shipping apps, which apply it document-wide. */
+body .markdown-body,
+body .markdown-body * {
+	box-sizing: border-box;
+}
+
+/* ══ 3. Prose ═══════════════════════════════════════════════════════════════ */
+
+/* markdown.css gives h1 and h2 a bottom rule and a 24px top margin; md gives
+   every heading the same weight, leading and rhythm and no rule at all. */
+body .markdown-body h1,
+body .markdown-body h2,
+body .markdown-body h3,
+body .markdown-body h4,
+body .markdown-body h5,
+body .markdown-body h6 {
+	font-weight: bold;
+	line-height: 1.25;
+	margin: 1.2em 0 0.5em;
+	border-bottom: none;
+	padding-bottom: 0;
+}
+
+body .markdown-body h1 { font-size: 2em; }
+body .markdown-body h2 { font-size: 1.6em; }
+body .markdown-body h3 { font-size: 1.3em; }
+body .markdown-body h4 { font-size: 1.1em; }
+body .markdown-body h5 { font-size: 1em; }
+/* h6 is the only heading that changes colour: it reads as a label, not a
+   heading. The native views mirror this (`level >= 6 ? .secondary : .primary`). */
+body .markdown-body h6 { font-size: 0.9em; color: var(--md-muted); }
+
+body .markdown-body p {
+	margin: 0 0 0.9em;
+}
+
+/* md sets no `text-decoration` on links, so the UA underline stands; VS Code
+   removes it and restores it on hover. The underline is restored here because
+   the renderer depends on it: `.md-fnref a` and `.md-fnback` explicitly set
+   `text-decoration: none`, which is only meaningful in a document where links
+   are underlined by default. */
+body .markdown-body a {
+	color: var(--md-accent);
+	text-decoration: underline;
+}
+
+body .markdown-body blockquote {
+	margin: 0 0 0.9em;
+	padding: 0 0 0 14px;
+	border-left: 4px solid var(--md-accent);
+	/* The quote's text goes muted and inherits down into anything nested inside
+	   it — a heading, a table, a diagram caption. That is intended, not a leak. */
+	color: var(--md-muted);
+	/* The webview default layer paints a quote background; md's quotes sit on
+	   the paper and are marked only by the accent rule. */
+	background: none;
+	border-radius: 0;
+}
+
+/* markdown.css gives `hr` a height and a bottom border; md draws it as a top
+   border, which is the same line but has to be undone first. */
+body .markdown-body hr {
+	border: none;
+	border-top: 1px solid var(--md-border);
+	height: auto;
+	margin: 1.4em 0;
+}
+
+/* The author's `\newpage`. On screen it is a dashed rule; the export sheet
+   turns it into `break-after: page`, which is invisible here and would make the
+   author's page breaks silently vanish from the preview. */
+body .markdown-body .md-pagebreak {
+	border-top: 2px dashed var(--md-border);
+	margin: 1.6em 0;
+}
+
+/* Images render at their natural size, only capped to the page width; height
+   follows so the aspect ratio never distorts. The `max-height` reset undoes
+   VS Code's `img, video { max-height: 100% }`, which usually resolves to `none`
+   against an auto-height ancestor — but not inside `.md-item`, which is a flex
+   container, where it would shrink an image in a list. */
+body .markdown-body img {
+	max-width: 100%;
+	max-height: none;
+	height: auto;
+}
+
+/* ══ 4. Lists ═══════════════════════════════════════════════════════════════ */
+
+/* The renderer emits no <ul>/<ol> for Markdown lists — it emits a flat run of
+   `.md-item` rows, each inset by `level * 1.6em` in an inline style, mirroring
+   the on-screen preview rather than reconstructing a tree from a non-tree
+   model. So these four rules *are* the entire list layout: there is no
+   `list-style` anywhere, and the only real <ol> in the document is the footnote
+   list. `min-width` plus `text-align: right` on the marker is what lines the
+   `9.` up under the `10.`. */
+body .markdown-body .md-list {
+	margin: 0 0 0.9em;
+}
+
+body .markdown-body .md-item {
+	display: flex;
+	gap: 0.5em;
+	margin: 0.22em 0;
+}
+
+body .markdown-body .md-marker {
+	color: var(--md-muted);
+	min-width: 1.5em;
+	text-align: right;
+}
+
+body .markdown-body .md-item.done {
+	color: var(--md-muted);
+	text-decoration: line-through;
+}
+
+/* ══ 5. Tables ══════════════════════════════════════════════════════════════ */
+
+/* Alignment is an inline style on every cell, so nothing here sets text-align.
+   No `width` either: md's tables shrink-wrap. */
+body .markdown-body table {
+	border-collapse: collapse;
+	margin: 0 0 0.9em;
+}
+
+body .markdown-body th,
+body .markdown-body td {
+	border: 1px solid var(--md-border);
+	padding: 6px 12px;
+}
+
+body .markdown-body th {
+	background: var(--md-secondary);
+}
+/* markdown.css draws a partial grid — a rule under the header and one between
+   body rows (`table > tbody > tr + tr > td`, (0,0,4)) — in a colour of its own.
+   Both are already beaten by the two rules above at (0,1,2), because a class
+   outranks any number of elements; md's full grid replaces them wholesale. */
+
+/* ══ 6. Code ════════════════════════════════════════════════════════════════ */
+
+body .markdown-body code,
+body .markdown-body pre {
+	font-family: var(--md-code-font);
+}
+
+/* The inline chip. */
+body .markdown-body code {
+	background: var(--md-secondary);
+	padding: 0.1em 0.3em;
+	border-radius: 4px;
+	font-size: 0.92em;
+	line-height: inherit;
+}
+
+body .markdown-body pre {
+	background: var(--md-secondary);
+	padding: 12px 14px;
+	border: none;
+	border-radius: 8px;
+	overflow-x: auto;
+	margin: 0 0 0.9em;
+}
+
+/* Undo the chip inside a block, and undo VS Code's `pre code { color:
+   var(--vscode-editor-foreground) }`, which would otherwise paint code in the
+   editor's ink on md's paper. `0.92em` does not compound: this rule and the
+   `code` rule set the same value, so a <code> inside a <pre> is 0.92em of the
+   body size, once.
+
+   `display: inline-block` is VS Code's, restated rather than inherited: it is
+   what lets the code box grow past the <pre>'s width so `overflow-x: auto`
+   above has something to scroll. The apps do without it because their WebView
+   lays the same block out from an inline <code>; here the surrounding rules are
+   VS Code's, and this one is load-bearing for them. */
+body .markdown-body pre code {
+	background: none;
+	color: inherit;
+	padding: 0;
+	font-size: 0.92em;
+	display: inline-block;
+}
+
+/* ── The "quiet paper" highlight.js theme ──────────────────────────────────
+   Six hand-written rules, deliberately NOT a stock hljs theme: github,
+   monokai and the rest are bright rainbows that fight the warm-paper,
+   typewriter look. Instead three quiet tones taken from the page's own
+   palette — language keywords and the structural names in the warm accent,
+   comments in muted italic, strings a softer shade of the ink; numbers and
+   everything else stay plain ink.
+
+   `.hljs` itself is left unstyled on purpose, so the block keeps `pre`'s
+   secondary background and the page's ink. Never ship a file from
+   highlight.js/styles/: every one of them sets `.hljs { background; color }`
+   and destroys the paper look.
+
+   Scoped away from the editor palette, where VS Code's own highlight.css —
+   which follows the colour theme's token colours — is exactly what the reader
+   asked for. The `:not()` also lifts these to (0,3,1), clearing highlight.css's
+   `.vscode-light .hljs-keyword` at (0,2,0) whichever of us loads first.
+
+   Unlike the apps, the tokens are already in the markup: highlight.js runs in
+   the extension host, so there is no live-DOM pass here and no flash of plain
+   code before it lands. */
+body:not([data-md-theme="editor"]) .markdown-body .hljs-keyword,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-selector-tag,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-built_in,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-literal,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-type,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-title,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-section,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-name,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-doctag {
+	color: var(--md-accent);
+}
+
+body:not([data-md-theme="editor"]) .markdown-body .hljs-comment,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-quote,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-meta {
+	color: var(--md-muted);
+	font-style: italic;
+}
+
+body:not([data-md-theme="editor"]) .markdown-body .hljs-string,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-regexp,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-symbol,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-char,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-attr,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-attribute,
+body:not([data-md-theme="editor"]) .markdown-body .hljs-addition {
+	color: var(--md-code-string);
+}
+
+body:not([data-md-theme="editor"]) .markdown-body .hljs-deletion {
+	color: var(--md-muted);
+	text-decoration: line-through;
+}
+
+body:not([data-md-theme="editor"]) .markdown-body .hljs-emphasis {
+	font-style: italic;
+}
+
+body:not([data-md-theme="editor"]) .markdown-body .hljs-strong {
+	font-weight: bold;
+}
+
+/* ══ 7. Rich blocks — diagrams and display formulas ═════════════════════════ */
+
+/* These render as SVG or as KaTeX markup, not as code, so they drop the
+   code-block chrome, centre themselves and scroll sideways rather than
+   overflow. `background: none` matters because `.mermaid` is a <pre> and would
+   otherwise wear the code tint. Inline math (`.md-mathi`) is deliberately
+   absent: it flows with the text and gets no rules at all.
+
+   `.md-mathd` reaches this rule as either a <div> (from a ```math fence) or a
+   <span> (from `$$…$$` inside a paragraph). On the span the padding and the
+   centring apply to an inline box, where they do next to nothing; it centres
+   anyway, because KaTeX inserts a display:block `.katex-display` inside it.
+   That asymmetry is the apps' behaviour too, and not worth a second class. */
+body .markdown-body .mermaid,
+body .markdown-body .plantuml,
+body .markdown-body .graphviz,
+body .markdown-body .md-mathd {
+	background: none;
+	padding: 6px 0;
+	margin: 0 0 0.9em;
+	border: none;
+	border-radius: 0;
+	overflow-x: auto;
+	text-align: center;
+}
+
+/* `.md-mathd` is missing from this list on purpose: KaTeX emits no <svg>. */
+body .markdown-body .mermaid svg,
+body .markdown-body .plantuml svg,
+body .markdown-body .graphviz svg {
+	max-width: 100%;
+	height: auto;
+}
+
+/* Mermaid and PlantUML are not restyled here, and that is a decision rather
+   than an omission. Mermaid writes its own theme stylesheet into every SVG it
+   draws, and PlantUML takes a `dark` flag into the engine; both read the
+   palette from `data-md-dark` on <body>, which the preview script sets. A CSS
+   colour rule over their output would fight a stylesheet we do not own and
+   would differ from the apps. Graphviz is the exception, immediately below,
+   and only because it draws in plain black. */
+
+/* Graphviz draws in plain black on a transparent ground (the engine is asked
+   for `bgcolor=transparent`, and for nothing else). It is recoloured to the
+   page's ink here, in CSS, rather than by passing colours to the engine: these
+   are presentation attributes, which any CSS rule outranks, and leaving the
+   engine's own attributes alone keeps the layout metrics — and so the label
+   positions it computed — exactly as Graphviz intended. A `fontname` or a
+   colour handed to the engine would change the metrics it lays the graph out
+   with, and the typewriter face does not exist on every platform anyway.
+
+   An author's own `fontcolor` / `color` survives: Graphviz writes those out as
+   attributes too, so each rule is scoped to the value the engine emits when
+   nothing was asked for — text with no fill of its own, and explicit black.
+
+   Do not merge these four into `[fill="black"], [stroke="black"]`. Graphviz
+   writes no `fill` at all for a default label, so `text:not([fill])` has no
+   black to match; it is the rule that carries every unstyled node label. */
+body .markdown-body .graphviz svg text:not([fill]) { fill: var(--md-ink); }
+body .markdown-body .graphviz svg text[fill="black"] { fill: var(--md-ink); }
+body .markdown-body .graphviz svg [stroke="black"] { stroke: var(--md-ink); }
+body .markdown-body .graphviz svg [fill="black"]:not(text) { fill: var(--md-ink); }
+
+/* KaTeX. `katex.min.css` is contributed after this file so that KaTeX's own
+   `.katex { font: normal 1.21em KaTeX_Main, … }` wins inside a formula — a
+   formula set in the page's prose face has the wrong glyph metrics. Nothing
+   here sets a font on a math container, for the same reason. Our two
+   contributions both beat KaTeX on specificity rather than on order:
+   `.md-mathd .katex-display` clears KaTeX's own `.katex-display { margin: 1em 0 }`,
+   which would otherwise stack on top of the container's 0.9em bottom margin.
+   `overflow-y: hidden` stops a stray vertical scrollbar on tall fractions.
+   The formula itself needs no colour rule: KaTeX inherits the page's ink. */
+body .markdown-body .md-mathd .katex-display {
+	margin: 0;
+}
+
+body .markdown-body .katex-display {
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding: 2px 0;
+}
+
+/* ══ 8. Footnotes ═══════════════════════════════════════════════════════════ */
+
+/* The references are superscript numerals in the running text; the notes
+   themselves sit under a rule at the foot of the document, a size down, with a
+   back-link to where they were cited. The whole section is muted; only the two
+   link classes take the accent. */
+body .markdown-body .md-fnref a {
+	text-decoration: none;
+	color: var(--md-accent);
+}
+
+body .markdown-body .md-footnotes {
+	margin-top: 2em;
+	font-size: 0.9em;
+	color: var(--md-muted);
+}
+
+/* The section opens with its own <hr>, which needs a tighter margin than the
+   1.4em a thematic break gets. */
+body .markdown-body .md-footnotes hr {
+	margin: 0 0 0.8em;
+}
+
+body .markdown-body .md-footnotes ol {
+	margin: 0;
+	padding-left: 1.6em;
+}
+
+body .markdown-body .md-footnotes li {
+	margin: 0.35em 0;
+}
+
+body .markdown-body .md-fnback {
+	text-decoration: none;
+	color: var(--md-accent);
+}

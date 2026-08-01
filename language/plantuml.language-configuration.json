@@ -1,0 +1,88 @@
+{
+  "comment": [
+    "PlantUML editing behaviour — the non-highlighting half of the language",
+    "contribution declared in package.json.",
+    "",
+    "Written as strict JSON on purpose. VS Code parses language configurations",
+    "with a JSONC reader (the schema sets allowComments), so `//` comments would",
+    "also load; keeping the file strict means it survives an ordinary JSON.parse",
+    "in a test or a CI check as well. The prose therefore lives in this key,",
+    "which the loader ignores.",
+    "",
+    "Two decisions here are deliberate and easy to undo by accident:",
+    "",
+    "  * The apostrophe is a line comment but is NOT an auto-closing pair.",
+    "    PlantUML comments a line out with a leading `'`, yet apostrophes are",
+    "    also ordinary punctuation in the labels the same file is full of",
+    "    (`Alice -> Bob : don't`). Auto-closing would insert a second one every",
+    "    time the author typed an English contraction.",
+    "",
+    "  * `<<` / `>>` surround a stereotype but are not auto-closing either, and",
+    "    they are not brackets. Sequence diagrams write `A <<-- B` and `A ->> B`,",
+    "    so a `<<` typed by the author is at least as likely to be the start of",
+    "    an arrow as the start of a stereotype, and declaring the pair as a",
+    "    bracket would make bracket-pair colourisation paint every `->>` as an",
+    "    unmatched closer. They stay in surroundingPairs, which only fires on a",
+    "    selection and so can never guess wrong.",
+    "",
+    "Folding is deliberately limited to the `@startX` / `@endX` pair. PlantUML",
+    "has plenty of other bracketing constructs — `alt`/`else`/`end`,",
+    "`note`/`end note`, `legend`/`end legend` — but a marker-based folder has",
+    "only one start pattern and one end pattern, so throwing them all into one",
+    "alternation means an `end note` nested inside an `alt` closes the `alt`.",
+    "A fold that lies about where a block ends is worse than no fold; indent",
+    "folding still handles the `{ … }` bodies.",
+    "",
+    "The word pattern is VS Code's default with `!`, `@` and `#` removed from",
+    "the separator class, so that double-clicking selects `!include`,",
+    "`@startuml` and `#AliceBlue` whole rather than in pieces. `$` is already a",
+    "word character by default, which is what `$variable` needs."
+  ],
+
+  "comments": {
+    "lineComment": "'",
+    "blockComment": ["/'", "'/"]
+  },
+
+  "brackets": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"]
+  ],
+
+  "autoClosingPairs": [
+    { "open": "{", "close": "}" },
+    { "open": "[", "close": "]" },
+    { "open": "(", "close": ")" },
+    { "open": "\"", "close": "\"", "notIn": ["string", "comment"] },
+    { "open": "/'", "close": "'/", "notIn": ["string", "comment"] }
+  ],
+
+  "surroundingPairs": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"],
+    ["\"", "\""],
+    ["<<", ">>"]
+  ],
+
+  "colorizedBracketPairs": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"]
+  ],
+
+  "folding": {
+    "markers": {
+      "start": "^\\s*@start[a-zA-Z]+\\b",
+      "end": "^\\s*@end[a-zA-Z]+\\b"
+    }
+  },
+
+  "indentationRules": {
+    "increaseIndentPattern": "(^.*\\{[^}]*$)",
+    "decreaseIndentPattern": "^\\s*\\}"
+  },
+
+  "wordPattern": "(-?\\d*\\.\\d\\w*)|([^\\`\\~\\%\\^\\&\\*\\(\\)\\-\\=\\+\\[\\{\\]\\}\\\\\\|\\;\\:\\'\\\"\\,\\.\\<\\>\\/\\?\\s]+)"
+}

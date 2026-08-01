@@ -1,0 +1,72 @@
+name: VS Code Build & Test
+
+on:
+  push:
+    # The family's default branch is `master`; `main` is listed too because
+    # the sibling repos ship workflows triggered on `main` while their real
+    # default branch is `master`, so their badges have been green off a
+    # 1.0-era commit ever since. Listing both means this badge reports the
+    # branch the work is actually on, whichever name the remote settles on.
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+jobs:
+  build-test:
+    name: Build and Test
+    # Unlike the Apple repos there is no SDK to pin a runner image to: the
+    # extension is TypeScript bundled by esbuild, and the tests are vitest
+    # over the parity core with no editor in the loop. Nothing here is
+    # platform-specific, so the cheapest hosted runner is the honest one.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # Pinned to the major the extension host actually runs: VS Code
+          # 1.95 — the oldest editor this extension declares support for —
+          # runs extensions on Node 20, and esbuild targets node20 to match.
+          # `latest` would let a newer major's API into the bundle and the
+          # failure would surface in a user's editor rather than here.
+          node-version: '20'
+
+      - name: Show toolchain
+        run: |
+          node --version
+          npm --version
+          npx tsc --version
+
+      - name: Install
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Package
+        # `vsce ls` prints the exact file manifest the .vsix will carry, so
+        # a mistake in .vscodeignore — the whole of `media/rich/` dropped,
+        # or `node_modules` swept in — shows up in the log as a list rather
+        # than as an extension that installs and cannot find its engines.
+        run: |
+          npx vsce ls
+          npx vsce package
+
+      - name: Upload the packaged extension
+        # The siblings upload artifacts only `if: failure()`, because there
+        # the artifact is a diagnostic. Here it is the build product, and
+        # the thing a human wants from a green run is the installable file.
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: '*.vsix'
+          retention-days: 7
