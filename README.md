@@ -177,4 +177,4 @@ and Android; the Marketplace takes a three-part version, so the family's
 
 ## License
 
-MIT — see [LICENSE](LICENSE). © 2026 nettrash (Ivan Alekseev).
+MIT — see [LICENSE](LICENSE). © 2026 nettrash.
