@@ -249,7 +249,7 @@ Questions and bug reports are welcome at
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE). © 2026 nettrash (Ivan Alekseev).
+MIT — see [LICENSE](LICENSE). © 2026 nettrash.
 
 The mathematics, diagram and highlighting engines are open-source projects
 carried inside the extension, under their own licences:

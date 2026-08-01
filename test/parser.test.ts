@@ -522,7 +522,7 @@ describe('front matter', () => {
   const yaml = doc(
     '---',
     'title: My Book',
-    'author: Ivan Alekseev',
+    'author: nettrash',
     'date: 2026-07-24',
     '---',
     '',
@@ -537,7 +537,7 @@ describe('front matter', () => {
     const matter = expectKind(blocks[0], 'frontMatter');
     expect(matter.fields).toEqual([
       { key: 'title', value: 'My Book' },
-      { key: 'author', value: 'Ivan Alekseev' },
+      { key: 'author', value: 'nettrash' },
       { key: 'date', value: '2026-07-24' },
     ]);
     expect(blocks.map((b) => b.kind)).not.toContain('thematicBreak');

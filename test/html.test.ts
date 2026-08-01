@@ -475,9 +475,9 @@ describe('delimited data', () => {
 
   // Swift: testDelimitedParsingFollowsRFC4180
   it('parses RFC 4180', () => {
-    expect(parseDelimited('Name,Note\n"Alekseev, Ivan","She said ""hi"""\nAnn,\n', ',')).toEqual([
+    expect(parseDelimited('Name,Note\n"Doe, Jane","She said ""hi"""\nAnn,\n', ',')).toEqual([
       ['Name', 'Note'],
-      ['Alekseev, Ivan', 'She said "hi"'],
+      ['Doe, Jane', 'She said "hi"'],
       ['Ann', ''],
     ]);
     expect(parseDelimited('a,"one\ntwo"\n', ',')).toEqual([['a', 'one\ntwo']]);
