@@ -93,11 +93,19 @@ specs/**
 #   media/rich/fonts/*.woff and *.ttf — every VS Code webview is Chromium
 #     and takes the woff2 that each @font-face lists first, so the older
 #     two formats are ~940 KB of dead weight here. They stay because the
-#     vendored tree is byte-identical in all four repos and trimming it
-#     for one platform is a family decision, not a packaging one.
+#     vendored tree is shared by all four repos and trimming it for one
+#     platform is a family decision, not a packaging one.
 #   media/rich/plantuml.js — 7 MB, and the single largest file in the
 #     package. There is no smaller build: it has no npm distribution and
-#     is vendored verbatim.
+#     is vendored whole, with ONE deliberate two-literal change: the
+#     build's own 4096-pixel gate — "Diagram too large for browser
+#     rendering" — is raised to 1.0E9 where width and height are checked.
+#     The gate guards a raster budget, and here that budget is bounded by
+#     layout, not by the diagram: every consumer takes the SVG except the
+#     EPUB export, whose canvas snapshots draw the laid-out rect that the
+#     page's own max-width rule has already capped. The patch's story, its
+#     verification and the guard that keeps a re-vendored engine from
+#     silently bringing the gate back live in test/plantuml-limit.test.ts.
 
 # Local scratch.
 .DS_Store

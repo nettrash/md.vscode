@@ -6,8 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 There is no build number to auto-increment here — no `agvtool bump` as on
 iOS and macOS, no Gradle `versionCode` finalizer as on Android — and the
-Marketplace requires a three-part version, so the family's two-part `1.0`
-is published as `1.0.0`. A republish that changes no behaviour is not
+Marketplace requires a three-part version, so the family's two-part `1.1`
+is published as `1.1.0`. A republish that changes no behaviour is not
 tracked here.
 
 This is a new app rather than a continuation of the apps' 1.3 line. Every
@@ -15,6 +15,33 @@ md port has begun at its own 1.0 and joined the family's number at the
 next family release, and this one does the same — arriving, because it
 comes last, with everything the other three learned through 1.3 already
 in it.
+
+## [1.1] — 2026-08-06
+
+### Fixed
+
+- **Large PlantUML diagrams render.** The vendored browser build of
+  PlantUML carries a hard limit of its own: a diagram whose finished
+  layout exceeded 4096 pixels in either direction was discarded, and the
+  block showed `Diagram too large for browser rendering: …` where the
+  drawing should have been — a 48-participant sequence diagram was
+  already past the line. That gate guards a raster budget, and no
+  drawing here can overspend one: the preview, the diagram panel and the
+  HTML, SVG and PDF exports take the SVG itself, whose dimensions are
+  numbers in a text file; the LaTeX export keeps the source; and the
+  EPUB export — the one path that does draw a diagram onto a canvas —
+  draws it at the size the page laid it out, already capped at the
+  page's own width. So the gate was defending a budget none of these
+  paths can exceed, and the price was real diagrams. It is raised out of
+  reach — to 10⁹ pixels, in the preview and in every export alike, since
+  all of them draw through the same engine. Measured in a real browser
+  rather than presumed: the
+  sequence diagram that used to die at the gate now arrives at
+  7656 × 1445 in about 70 ms, a 120-participant one at 19 397 × 3533 in
+  about 130 ms, and a small diagram renders byte-identically to before.
+  This is the one deliberate departure from the engine's vendored bytes;
+  it is documented where the vendoring story is told, and a test now
+  fails loudly if a future engine update quietly brings the limit back.
 
 ## [1.0] — 2026-08-01
 

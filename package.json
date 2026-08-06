@@ -2,7 +2,7 @@
   "name": "md-vscode",
   "displayName": "md",
   "description": "Markdown preview with math, chemistry and diagrams — KaTeX, Mermaid, Graphviz and PlantUML, all rendered on-device with nothing sent anywhere.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "nettrash",
   "license": "MIT",
   "author": {

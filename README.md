@@ -164,16 +164,18 @@ npm test
 # Bundle the extension host and the preview script
 npm run compile
 
-# Build the installable .vsix, and list what it will contain
-npx vsce ls
-npx vsce package
+# Build the installable .vsix, and list what it will contain. Packaging
+# goes through the script, never through `vsce package` directly — the
+# script stands the Marketplace listing in as the packaged README.md for
+# the length of the run, and `vscode:prepublish` refuses a direct call.
+node scripts/package.mjs --list
 ```
 
 Requires Node 20, the major VS Code runs extensions on. Press F5 in this
 repository to launch an Extension Development Host with the extension
 loaded. There is no build number to increment as there is on iOS, macOS
 and Android; the Marketplace takes a three-part version, so the family's
-`1.0` is published as `1.0.0`.
+`1.1` is published as `1.1.0`.
 
 ## License
 

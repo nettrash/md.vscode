@@ -6,8 +6,10 @@
 //     by the host and must stay external. The vendored engines under
 //     `media/rich/` are ALSO external and deliberately un-bundled: they are
 //     loaded at runtime from disk by absolute path, so they keep their exact
-//     vendored bytes (parity with the iOS / macOS / Android apps) and the
-//     7.4 MB PlantUML engine never enters a bundle.
+//     vendored bytes (parity with the iOS / macOS / Android apps — one
+//     deliberate exception, PlantUML's size gate, is documented in
+//     test/plantuml-limit.test.ts) and the 7.4 MB PlantUML engine never
+//     enters a bundle.
 //
 //  2. `media/preview/md-preview.js` — the client script contributed into VS
 //     Code's built-in Markdown preview. Browser/IIFE, no imports at load time:

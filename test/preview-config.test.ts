@@ -96,8 +96,8 @@ describe('readConfig — the font sanitiser', () => {
   });
 
   it('keeps a face named in a non-Latin script', () => {
-    stub({ 'preview.bodyFont': 'PingFang SC, Иван, serif' });
-    expect(readConfig().bodyFont).toBe('PingFang SC, Иван, serif');
+    stub({ 'preview.bodyFont': 'PingFang SC, Гарнитура, serif' });
+    expect(readConfig().bodyFont).toBe('PingFang SC, Гарнитура, serif');
   });
 
   // The setting is `resource`-scoped, so a workspace `.vscode/settings.json` —
