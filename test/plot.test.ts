@@ -39,6 +39,7 @@ import {
   plotCacheStats,
   PlotError,
   plotSVG,
+  pow10,
   renderPlot,
   resetPlotCache,
 } from '../src/render/plot';
@@ -120,6 +121,137 @@ describe('niceStep', () => {
     expect(niceStep(20)).toBe(2);
     expect(niceStep(50)).toBe(5);
     expect(niceStep(64)).toBe(10);
+  });
+
+  // MARK: - The decade, and why it is not a `pow`
+  //
+  // THIS WAS A REAL FAILURE, NOT A HYPOTHETICAL. The pushed v1.2.0 (fd71a4e)
+  // computed the decade as `Math.pow(10, Math.floor(Math.log10(rough)))` and
+  // went red on GitHub Actions (Node 20) with three failures in this file,
+  // while all 437 tests passed on the development machine (Node 26):
+  //
+  //     niceStep > reproduces all 81 recorded spacings, bit for bit
+  //     the two corrected axis behaviours > keeps the tick that lands exactly
+  //         on the maximum        (nine x labels expected, eight drawn)
+  //     the 22 recorded figures > tiny_range: x
+  //
+  // THE AXIS IS THE ENGINE VERSION, NOT THE CPU — the earlier wording here
+  // blamed "Linux x64 vs macOS arm64" and sent the next reader to the wrong
+  // place. Comparing `Math.pow(10, n)` with the literal `1e<n>` for all 632
+  // integer exponents in [-323, 308]:
+  //
+  //     Node 20, arm64   68 of 632      Node 20, x86-64   69 of 632
+  //     Node 22, arm64   68 of 632      Node 24, arm64     2 (e = 23, 210)
+  //     Node 26, arm64    0 of 632      Darwin libm pow    0 — all 632 right
+  //     OpenJDK 21       Math.pow(10.0, -5.0) is one ULP below its literal
+  //
+  // Node 20 is wrong on both architectures and Node 26 is right on both. CI
+  // pins Node 20 because that is what VS Code 1.95's extension host runs; this
+  // machine runs Node 26, the one version with a perfect score, which is why
+  // review missed it, and Darwin's libm is correct for every exponent, so md
+  // and md.macOS cannot see it at all. On the decade this renderer needs:
+  //
+  //     rough = 9.999999999999999e-5              bits 3f1a36e2eb1c432c
+  //     Node 26:  Math.pow(10, -4) === 1e-4       bits 3f1a36e2eb1c432d
+  //     Node 20:  Math.pow(10, -4)                bits 3f1a36e2eb1c432c
+  //
+  // It was diagnosed by stubbing Math.pow to the value the older engine
+  // returns: with the pushed v1.2.0 arithmetic those exact three fail and
+  // nothing else does. That stub is not what either test below does — read
+  // their comments for what each one actually guarantees.
+  //
+  // `pow` is not correctly rounded and is not specified to be, in any of the
+  // five languages this renderer is written in. One ULP of `mag` moves `norm`
+  // across a threshold of the 1/2/5/10 ladder, which changes the step, which
+  // changes how many ticks the axis has and what they say — drawn output, not
+  // just a number in a test. `log10` is not correctly rounded either, so its
+  // `floor` cannot be trusted at a decade boundary and is treated here as a
+  // guess to be corrected.
+  //
+  // The fix is to read the decade off a correctly-rounded decimal literal and
+  // pin the exponent by exact comparison. `Math.pow(10, e)` must never come
+  // back — in this file or in md, md.macOS or md.Android, which transliterate
+  // it. The second test below is the family's one real mechanism guard: it
+  // makes `Math.pow` throw, so a reintroduced `pow` fails on every engine and
+  // every platform, and md / md.macOS / md.Android point at it because a
+  // correct libm leaves them no way to reproduce the failure themselves.
+
+  it('builds every decade from a decimal literal, bit for bit', () => {
+    // The CONTRACT, not the mechanism: `pow10(e)` must equal the literal
+    // `1e<e>` to the bit. Decimal→double conversion is correctly rounded by
+    // specification in JS, Swift, Kotlin and Rust; `pow` is not.
+    //
+    // Be clear about what this cannot do. On an engine whose `pow` already
+    // agrees with the literal at these exponents — Node 26 here, and Darwin's
+    // libm under the md and md.macOS twins of this test — every assertion
+    // below passes whether `pow10` parses a literal or calls `Math.pow`, so
+    // running it green proves the value, never the mechanism. It does bite on
+    // an affected engine: e = -4 is one of Node 20's 68 disagreements, and
+    // Node 20 is what CI runs. The check that holds on every engine is the
+    // next test, which replaces `Math.pow` with a function that throws.
+    expect(bits(pow10(-4))).toBe(bits(1e-4));
+    expect(bits(pow10(-4))).toBe('3f1a36e2eb1c432d');
+    const literals: readonly (readonly [number, number])[] = [
+      [-9, 1e-9], [-7, 1e-7], [-5, 1e-5], [-4, 1e-4], [-3, 1e-3], [-2, 1e-2],
+      [-1, 1e-1], [0, 1e0], [1, 1e1], [2, 1e2], [3, 1e3], [6, 1e6], [9, 1e9],
+      [12, 1e12], [15, 1e15],
+    ];
+    for (const [exponent, literal] of literals) {
+      expect(bits(pow10(exponent)), `pow10(${exponent})`).toBe(bits(literal));
+    }
+    // A decade below the normal range still parses correctly — the vectors
+    // carry one, at rough = 2.781342323134e-309.
+    expect(bits(pow10(-309))).toBe(bits(1e-309));
+    // The limits `floor(log10 rough)` reaches on the degenerate ranges the
+    // vectors record, which is what keeps niceStep(0) === 0 and
+    // niceStep(inf) === inf. `Number('1e-Infinity')` would be NaN.
+    expect(pow10(Number.NEGATIVE_INFINITY)).toBe(0);
+    expect(pow10(Number.POSITIVE_INFINITY)).toBe(Number.POSITIVE_INFINITY);
+    expect(pow10(Number.NaN)).toBeNaN();
+  });
+
+  it('gets the boundary decade right without Math.pow, and survives a wrong log10', () => {
+    // The family's mechanism guard — the one check in the four ports that a
+    // correct `pow` cannot hide: `Math.pow` is replaced by a function that
+    // throws, so any reintroduction of `pow` in the decade path fails here
+    // regardless of engine version or platform, and `log10` is then perturbed
+    // by ±1 decade with all 81 oracle rows still required to match.
+    //
+    // `tiny_range`: [0.0001, 0.0009] is the figure the CI failure was drawn
+    // from. Its rough is one ULP below the decade, so the emitted step must be
+    // the literal 1e-4 — on every engine, whatever `Math.pow` says there.
+    const range = 0.0009 - 0.0001;
+    expect(bits(range / 8)).toBe('3f1a36e2eb1c432c');
+    expect(bits(niceStep(range))).toBe(bits(1e-4));
+
+    const pow = Math.pow;
+    const log10 = Math.log10;
+    try {
+      // If the decade ever goes back to a `pow`, this throws instead of
+      // silently returning an engine-dependent double.
+      Math.pow = (() => {
+        throw new Error('niceStep must not call Math.pow — see the note above');
+      }) as typeof Math.pow;
+      // And `floor(log10)` is only a guess: hand it the two answers a
+      // differently-rounded `log10` could give — ±1 decade — and demand all 81
+      // oracle rows still match. Both are corrected by the exact comparison
+      // against pow10.
+      for (const [name, wrong] of [
+        ['one decade low', (x: number) => log10(x) - 1],
+        ['one decade high', (x: number) => log10(x) + 1],
+      ] as const) {
+        Math.log10 = wrong as typeof Math.log10;
+        expect(bits(niceStep(range)), `tiny_range, ${name}`).toBe(bits(1e-4));
+        for (const row of VECTORS.niceStep) {
+          expect(bits(niceStep(real(row.input))), `niceStep(${row.input}), ${name}`).toBe(
+            row.outputBits,
+          );
+        }
+      }
+    } finally {
+      Math.pow = pow;
+      Math.log10 = log10;
+    }
   });
 });
 

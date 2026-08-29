@@ -1492,16 +1492,113 @@ function fitMargins(total: number, low: number, high: number): { low: number; hi
 // MARK: - Axes
 
 /**
- * The site's tick spacing, ported exactly.
+ * `10ᵉ`, built by **parsing a decimal literal** — never by `Math.pow(10, e)`.
+ *
+ * `pow` is not correctly rounded and no language specifies it to be, so it is
+ * free to differ between implementations, and it does. **The axis it varies
+ * along is the engine version, not the CPU** — measured by comparing
+ * `Math.pow(10, n)` against the decimal literal `1e<n>` for all 632 integer
+ * exponents in [-323, 308]:
+ *
+ * ```
+ * Node 20, arm64     68 of 632 disagree      Node 20, x86-64   69 of 632
+ * Node 22, arm64     68 of 632
+ * Node 24, arm64      2 of 632  (e = 23 and 210)
+ * Node 26, arm64      0 of 632
+ * Darwin libm pow     0 of 632  — correct for every one of them
+ * OpenJDK 21         Math.pow(10.0, -5.0) is one ULP below its literal
+ * ```
+ *
+ * Node 20 is wrong on **both** architectures and Node 26 is right on both:
+ * what moves the answer is the V8 version. On the decade this renderer
+ * actually needs:
+ *
+ * ```
+ * rough = 9.999999999999999e-5         bits 3f1a36e2eb1c432c
+ * Node 26: Math.pow(10, -4) === 1e-4   bits 3f1a36e2eb1c432d
+ * Node 20: Math.pow(10, -4)            bits 3f1a36e2eb1c432c  (one ULP lower)
+ * ```
+ *
+ * A different `mag` gives a different `norm`, which crosses a threshold of the
+ * 1/2/5/10 ladder, which changes the tick step — so the axis gets a different
+ * number of ticks and different labels and the figure's bytes change. That is
+ * a rendering bug, not a test artefact; it is what turned md.vscode's CI red on
+ * the pushed v1.2.0 (fd71a4e) with three failures in `test/plot.test.ts` while
+ * every one of them passed on the development machine. CI is not the only
+ * exposure either: this extension declares VS Code ^1.95, whose extension host
+ * runs Node 20 — which is precisely why the workflow pins that major — so an
+ * affected engine is what a reader's editor runs.
+ *
+ * Why review did not catch it: the development Mac runs Node 26, the one
+ * version in the table with a perfect score, and Darwin's own libm is correct
+ * for all 632, so md and md.macOS cannot reproduce it at all. The guard that
+ * bites everywhere lives in this repo's `test/plot.test.ts`, which replaces
+ * `Math.pow` with a function that throws (and perturbs `log10` by ±1 decade,
+ * demanding all 81 oracle rows still match); the Swift and Kotlin ports point
+ * at that test because on their platform no assertion about a decade's value
+ * can tell a literal from a `pow`.
+ *
+ * Decimal→double conversion, by contrast, **is** specified to be correctly
+ * rounded in every language this file is transliterated into — JS `Number()`,
+ * Swift `Double(_:)`, Kotlin `String.toDouble()`, Rust `str::parse::<f64>` — so
+ * the literal is the same double on every platform. A table of hand-written
+ * literals (`1e-5`, `1e-4`, …) is equally fine; what must never come back is
+ * `pow(10, e)`.
+ *
+ * Building the decade arithmetically is **not** a substitute either: looping
+ * `r *= 10` / `r /= 10` lands on a different double from the correctly-rounded
+ * literal for 25 of the 61 exponents in [-30, 30].
+ *
+ * The non-finite exponents are the limits `Math.floor(Math.log10(rough))`
+ * produces for the degenerate ranges the vectors record — −∞ for `rough = 0`,
+ * +∞ for `rough = ∞`, NaN for `rough < 0` — and returning `0` / `∞` / `NaN`
+ * there is what keeps `niceStep(0) === 0`, `niceStep(∞) === ∞` and
+ * `niceStep(-1)` NaN, exactly as the site computes them. `Number('1e-Infinity')`
+ * would be NaN, so this cannot be left to the parse.
+ *
+ * **Transliterating this.** Two things JavaScript gives away for free and the
+ * statically-typed ports do not. (1) `Number()` saturates at both ends of the
+ * exponent range on its own — `'1e309'` is ∞ and `'1e-324'` is 0 — so no clamp
+ * is needed here; a port whose parse returns an optional or throws needs one.
+ * (2) The exponent is a `number` here, so ±∞ and NaN flow through; a port that
+ * makes it an `Int` cannot represent them and must instead guard the degenerate
+ * ranges at the top of {@link niceStep}, before `Int(floor(log10(rough)))` can
+ * trap or saturate. Either shape is fine — the five degenerate vector rows
+ * (0, −1, NaN, ∞ and 5e-324) are what pin it.
+ */
+export function pow10(exponent: number): number {
+  if (!Number.isFinite(exponent)) {
+    if (exponent < 0) return 0;
+    if (exponent > 0) return Number.POSITIVE_INFINITY;
+    return Number.NaN;
+  }
+  return Number(`1e${exponent}`);
+}
+
+/**
+ * The site's tick spacing, ported exactly — with the decade made portable.
  *
  * ```
  * rough = range / 8 ; mag = 10^floor(log10 rough) ; norm = rough / mag
  * step  = (norm<=1.5 ? 1 : norm<=3 ? 2 : norm<=7 ? 5 : 10) * mag
  * ```
+ *
+ * `Math.log10` is no more correctly rounded than `Math.pow` is, so its `floor`
+ * cannot be trusted at a decade boundary either. It is used here only as a
+ * first guess, and the exponent is then **pinned by exact comparison against
+ * the decades themselves** so that `pow10(e) <= rough < pow10(e+1)` holds. One
+ * correction step is enough: `log10` is never off by more than one.
+ *
+ * Cheap by construction — `niceStep` runs twice per figure and figures are
+ * memoised, so at most six decimal parses per rendered plot.
  */
 export function niceStep(range: number): number {
   const rough = range / 8;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rough)));
+  // An approximation, nothing more; the two comparisons below are the truth.
+  let exponent = Math.floor(Math.log10(rough));
+  if (pow10(exponent) > rough) exponent -= 1;
+  else if (pow10(exponent + 1) <= rough) exponent += 1;
+  const magnitude = pow10(exponent);
   const normalised = rough / magnitude;
   let step = 10;
   if (normalised <= 1.5) step = 1;
