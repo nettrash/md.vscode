@@ -32,11 +32,12 @@ There is no account, no server of ours and no network round trip.
 
 ## Screenshots
 
-![md rendering mathematics, a diagram and highlighted code in a dark colour theme](media/marketplace/preview-dark.png)
+![md rendering mathematics, chemistry and a chart in a dark colour theme](media/marketplace/preview-dark.png)
 
-*The preview pane in a dark colour theme — mathematics set by KaTeX, Mermaid,
-Graphviz and PlantUML drawings, and a fenced code block coloured by
-highlight.js.*
+*A chart beside the formula that produced it, in a dark colour theme —
+mathematics and chemistry set by KaTeX, and the chart drawn by the extension
+itself, with no engine behind it. Its ink follows the theme, so the same fence
+reads correctly light or dark.*
 
 ![The same document in a light colour theme](media/marketplace/preview-light.png)
 
