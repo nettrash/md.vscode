@@ -22,5 +22,6 @@
   "examples/05-Images": "",
   "examples/06-Math": "math",
   "examples/07-Diagrams": "mermaid plantuml graphviz",
-  "examples/08-Writer Tools": "highlight"
+  "examples/08-Plots": "",
+  "examples/09-Writer Tools": "highlight"
 }

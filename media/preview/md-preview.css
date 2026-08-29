@@ -600,6 +600,7 @@ body .md-preview-root:not([data-md-theme="editor"]) .hljs-strong {
 body .markdown-body .mermaid,
 body .markdown-body .plantuml,
 body .markdown-body .graphviz,
+body .markdown-body .plot,
 body .markdown-body .md-mathd {
 	background: none;
 	padding: 6px 0;
@@ -610,10 +611,13 @@ body .markdown-body .md-mathd {
 	text-align: center;
 }
 
-/* `.md-mathd` is missing from this list on purpose: KaTeX emits no <svg>. */
+/* `.md-mathd` is missing from this list on purpose: KaTeX emits no <svg>.
+   `.plot` is here because the plot renderer emits nothing else: the figure is
+   inline SVG in the markup itself, with no engine to wait for. */
 body .markdown-body .mermaid svg,
 body .markdown-body .plantuml svg,
-body .markdown-body .graphviz svg {
+body .markdown-body .graphviz svg,
+body .markdown-body .plot svg {
 	max-width: 100%;
 	height: auto;
 }

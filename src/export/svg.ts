@@ -24,15 +24,15 @@ import { parse } from '../render/parser';
 import { graphvizEngines, isRawGraphviz, isRawPlantUML } from '../render/html';
 import { trimWS } from '../render/text';
 
-export type DiagramKind = 'mermaid' | 'plantuml' | 'graphviz';
+export type DiagramKind = 'mermaid' | 'plantuml' | 'graphviz' | 'plot';
 
 /** One diagram the document offers for SVG export, in document order. */
 export interface Diagram {
   /**
    * 0-based position among the document's diagrams — the same order
-   * `querySelectorAll('pre.mermaid, div.plantuml, div.graphviz')` reports the
-   * rendered containers in, so the capture step pulls the matching `<svg>` back
-   * out by this index.
+   * `querySelectorAll('pre.mermaid, div.plantuml, div.graphviz, div.plot')`
+   * reports the rendered containers in, so the capture step pulls the matching
+   * `<svg>` back out by this index.
    */
   ordinal: number;
   kind: DiagramKind;
@@ -64,6 +64,8 @@ export function typeName(diagram: Diagram): string {
         return `Graphviz (${diagram.engine})`;
       }
       return 'Graphviz';
+    case 'plot':
+      return 'Plot';
   }
 }
 
@@ -81,8 +83,9 @@ export function menuTitle(diagram: Diagram): string {
  *
  *  * a raw `.puml` / `.gv` document is one diagram — the whole file, since
  *    `renderBody` renders it without parsing Markdown at all;
- *  * otherwise every fenced block whose info string names Mermaid, PlantUML or
- *    a Graphviz layout — **including one nested in a block quote**, which the
+ *  * otherwise every fenced block whose info string names Mermaid, PlantUML, a
+ *    Graphviz layout or a plot — **including one nested in a block quote**,
+ *    which the
  *    renderer draws by recursing into the quote, so the walk recurses too and
  *    the quoted diagram keeps its place.
  *
@@ -134,6 +137,12 @@ function classify(language: string | null): { kind: DiagramKind; engine: string 
   }
   const engine = graphvizEngines[lang];
   if (engine !== undefined) return { kind: 'graphviz', engine };
+  // A plot is a diagram here even though no engine draws it: the renderer put a
+  // real `<svg>` in the container, which is exactly what this command saves. It
+  // is also why the capture selector below must list `div.plot` — a container
+  // this walk counts and the DOM query does not would shift every later diagram
+  // onto the wrong figure.
+  if (lang === 'plot') return { kind: 'plot', engine: null };
   return null;
 }
 

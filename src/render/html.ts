@@ -39,6 +39,7 @@
 import type { Block, ColumnAlignment, ListItem, PlacedBlock } from './types';
 import { parse, parseWithLines, slug } from './parser';
 import { escapeHTML, inline } from './inline';
+import { renderPlot } from './plot';
 import { stylesheet } from './css-text';
 import { trimWS, trimWSNL } from './text';
 
@@ -69,6 +70,16 @@ export interface RenderOptions {
   diagramSources?: boolean;
   /** When omitted, every container is emitted exactly as MarkdownHTML.swift emits it. */
   engines?: EngineHooks;
+  /**
+   * Draw ```plot fences (the default).
+   *
+   * `false` — `md.diagrams.plot` — keeps the container and leaves the source
+   * visible, which is what switching off Mermaid or Graphviz does. It is not an
+   * engine hook because there is no engine: `renderPlot` is a pure function in
+   * this same layer, so the apps, which have no per-diagram settings, simply
+   * never pass this and always draw.
+   */
+  plot?: boolean;
   /** Override the `<head>` asset URLs (VS Code rewrites these to webview URIs). No trailing slash. */
   assetBase?: string;
 }
@@ -443,6 +454,20 @@ function renderCodeBlock(language: string | null, code: string, opts: RenderOpti
     // while `$$…$$` inside a paragraph is a `<span>`. Both are display mode and
     // both are found by `.md-mathd`.
     return `<div class="md-mathd">${escapeHTML(code)}</div>`;
+  }
+  if (lang === 'plot') {
+    // The one rich block with no engine behind it. `renderPlot` is pure and
+    // synchronous and lives in this same layer, so the finished `<svg>` is
+    // already in the string every surface receives: the preview, the
+    // self-contained HTML, print, PDF, EPUB and the SVG export all work with no
+    // script, no asset and no rasterisation step, and a plot-only document
+    // never loads an engine at all.
+    //
+    // The container is emitted whatever happens — a good plot, an empty block
+    // and a broken one alike — because the SVG export pairs a figure with its
+    // source block by counting `div.plot` containers in document order.
+    if (opts.plot === false) return `<div class="plot"><pre>${escapeHTML(code)}</pre></div>`;
+    return renderPlot(code);
   }
   if (lang.length > 0) {
     // A real code language. The diagram / math / data languages were handled

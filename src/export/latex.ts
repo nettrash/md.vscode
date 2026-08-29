@@ -885,6 +885,14 @@ class Writer {
     if (graphvizEngines[lower] !== undefined) {
       return this.diagram(name, code);
     }
+    if (lower === 'plot') {
+      // The one rich fence this app *can* draw without an engine — and it still
+      // travels as its source. `\includegraphics` reads no SVG without a
+      // conversion step a `.tex` file cannot carry, so the honest thing is the
+      // same treatment a Mermaid diagram gets: every number the author wrote,
+      // under a comment naming the language.
+      return this.diagram(name, code);
+    }
     if (lower === 'csv' || lower === 'tsv') {
       // Already a table everywhere else in the app; the parse and the alignment
       // rule are shared with the HTML renderer so the same spreadsheet lands

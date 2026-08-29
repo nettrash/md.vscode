@@ -54,6 +54,32 @@ Two consequences follow, and both are easy to get wrong:
   repository's branch, so a page whose images exist only in the working
   tree publishes with three holes in it.
 
+## Retaking the screenshots
+
+The three images in `media/marketplace/` were originally made ad hoc, so
+nothing recorded what was in them and they could not be reproduced. The
+document they should show now lives beside this file, as
+[`screenshot-source.md`](screenshot-source.md): it exercises mathematics,
+chemistry, a plot, Mermaid, Graphviz, highlighted code and a table in one
+page, and every one of those is asserted to render before it is committed.
+`marketplace/**` is excluded by `.vscodeignore`, so it never ships inside
+the `.vsix`.
+
+To retake them: open `screenshot-source.md`, *Open Preview to the Side*,
+and capture the editor and preview together — once in a dark colour theme
+as `preview-dark.png`, once in a light one as `preview-light.png`. For
+`diagram-panel.png`, open any `.puml` file and run *md: Show Diagram
+Preview*. Keep the window near the width of the existing images so the
+three sit together on the page.
+
+**The captions in `extension-README.md` name what is in frame, so they
+have to be retaken and rewritten together.** As of 1.2 the images predate
+the plot fence: the listing describes charts and the screenshots do not
+show one. The captions are accurate for the images that exist today and
+must be corrected in the same commit that replaces them — a caption
+promising a chart over a picture without one is the failure mode this
+paragraph exists to prevent.
+
 | Source | Marketplace field | Limit | Current (1.0.0) |
 | --- | --- | --- | --- |
 | `package.json` `publisher` + `name` | Unique identifier | lowercase, no spaces | `nettrash.md-vscode` |
@@ -108,15 +134,27 @@ web page. Four consequences shape how it is written:
   as `media/marketplace/…` rather than by absolute URL. A link that must
   not be rewritten has to be absolute.
 - **Badges render only from approved domains.** The build badge points at
-  `github.com` and the version, install, rating and licence badges at
-  `img.shields.io`, both of which are on Microsoft's approved list. A
-  badge served from anywhere else is stripped rather than shown. And a
-  badge must point at a workflow that exists — the Android repo ships no
-  CI and therefore no badge, on purpose.
-- **The three shields.io Marketplace badges read live counts** for
-  `nettrash.md-vscode` and therefore show nothing useful, or an error
-  slug, until the first version is published. That is expected and needs
-  no edit — they fill themselves in.
+  `github.com`, the version and install badges at `vsmarketplacebadges.dev`
+  and the licence badge at `img.shields.io`, all three of which are on
+  Microsoft's approved list. A badge served from anywhere else is
+  stripped rather than shown. And a badge must point at a workflow that
+  exists — the Android repo ships no CI and therefore no badge, on
+  purpose.
+- **The Marketplace badges are not shields.io's**, and this is the one
+  thing here that has already had to be corrected once.
+  `img.shields.io/visual-studio-marketplace/…` — the `v`, `i` and `r`
+  routes this file used to name — were **retired by shields.io**, and a
+  retired route still answers `200` with a grey *"retired badge"* pill
+  rather than an error, so nothing breaks loudly and a stale badge can
+  sit in a listing looking merely unpopular. The version and install
+  badges now come from `vsmarketplacebadges.dev` (also on Microsoft's
+  approved list), which reads the live Marketplace API and was checked
+  returning `v1.1.0` and the real install count.
+- **There is no rating badge, deliberately.** `nettrash.md-vscode` has no
+  ratings at all — the Marketplace API returns no rating statistic for
+  it — so every provider's rating badge renders `0/5 (0 ratings)`, which
+  reads as a bad score rather than as an absent one. A rating badge is
+  worth adding back the day the extension has ratings, and not before.
 
 ## Ground rules these texts follow
 

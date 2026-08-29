@@ -65,11 +65,11 @@ th { background: #EAE2CF; }
 /* Rich blocks: diagrams and display formulas render as SVG/markup, not
    code — drop the code-block chrome, centre them, allow horizontal
    scroll. Inline math (.md-mathi) flows with the text. */
-.mermaid, .plantuml, .graphviz, .md-mathd {
+.mermaid, .plantuml, .graphviz, .plot, .md-mathd {
     background: none; padding: 6px 0; margin: 0 0 0.9em;
     overflow-x: auto; text-align: center;
 }
-.mermaid svg, .plantuml svg, .graphviz svg { max-width: 100%; height: auto; }
+.mermaid svg, .plantuml svg, .graphviz svg, .plot svg { max-width: 100%; height: auto; }
 /* Graphviz draws in plain black on a transparent ground (md-init.js
    asks for `bgcolor=transparent`). Recolor it to the page's ink here,
    in CSS, rather than passing colors to the engine: these are

@@ -134,7 +134,7 @@ A fenced code block using tildes:
 ~~~json
 {
   "name": "md",
-  "platforms": ["iOS", "iPadOS"],
+  "platforms": ["Visual Studio Code"],
   "dependencies": []
 }
 ~~~
@@ -333,8 +333,7 @@ A list item containing a fenced code block:
 
 1. Run the build:
    ```bash
-   xcodebuild build -project md.xcodeproj -scheme md \
-     -destination 'generic/platform=iOS'
+   npm ci && npm run compile
    ```
 2. Open a `.md` file and start editing.
 

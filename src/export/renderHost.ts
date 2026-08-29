@@ -52,15 +52,22 @@ import { richRoot } from '../engines/paths';
 import { RICH_SELECTOR } from './epub';
 
 /**
- * The diagram half of {@link RICH_SELECTOR}.
+ * The diagram half of {@link RICH_SELECTOR}, plus `div.plot`.
  *
  * `DiagramSVG.ordinal` is a position among *diagrams only*, so the SVG capture
  * indexes this list rather than the wider one — and the two must keep agreeing
  * about what a diagram is, which is why both are written out here beside each
  * other rather than composed from a shared fragment that would read as though
  * the order did not matter.
+ *
+ * `div.plot` is the one class that is here and deliberately **not** in
+ * `RICH_SELECTOR`. The EPUB path photographs elements whose drawing the markup
+ * does not contain; a plot is already an `<svg>` in the string the renderer
+ * returned, so there is nothing to rasterise — but it is still a diagram a
+ * reader can save, and `svg.ts`'s `classify` counts it, so this query has to
+ * find it or every later figure exports as the wrong one.
  */
-export const DIAGRAM_SELECTOR = 'pre.mermaid, div.plantuml, div.graphviz';
+export const DIAGRAM_SELECTOR = 'pre.mermaid, div.plantuml, div.graphviz, div.plot';
 
 /** One rasterised rich block, as the EPUB path consumes it. */
 export interface RichSnapshot {

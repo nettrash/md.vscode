@@ -60,10 +60,21 @@ describe('readConfig — defaults', () => {
 
   it('defaults every engine to on and the page size to A4', () => {
     const c = readConfig();
-    expect([c.math, c.mermaid, c.graphviz, c.plantuml, c.highlight]).toEqual([
-      true, true, true, true, true,
+    // Six, not five: `plot` joined them, and it is the odd one out — there is
+    // no engine behind it, so switching it off loads nothing less. It is a
+    // setting because the other four are, and because a reader who wants the
+    // source of a figure should be able to see it.
+    expect([c.math, c.mermaid, c.graphviz, c.plantuml, c.plot, c.highlight]).toEqual([
+      true, true, true, true, true, true,
     ]);
     expect(c.pageSize).toBe('A4');
+  });
+
+  it('reads md.diagrams.plot', () => {
+    stub({ 'diagrams.plot': false });
+    expect(readConfig().plot).toBe(false);
+    stub({ 'diagrams.plot': true });
+    expect(readConfig().plot).toBe(true);
   });
 });
 

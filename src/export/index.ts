@@ -102,9 +102,11 @@ export async function exportSvg(document: vscode.TextDocument): Promise<void> {
   if (destination === null) return;
 
   // `dark: false` because an `.svg` file carries no screen theme — Mermaid bakes
-  // its own colours in, Graphviz and PlantUML draw explicit ink — and
-  // `export: true` only to keep the same page every other capture uses; it
-  // changes nothing in the vector.
+  // its own colours in, Graphviz and PlantUML draw explicit ink, and a plot
+  // draws in `currentColor`, which in a standalone file resolves to the
+  // initial colour, i.e. black on the viewer's own page — and `export: true`
+  // only to keep the same page every other capture uses; it changes nothing in
+  // the vector.
   const html = renderDocument(source, { title, dark: false, export: true });
   const svg = await withRenderHost(html, title, 'Rendering the diagram…', (host) =>
     host.diagramSVG(diagram.ordinal),

@@ -213,6 +213,11 @@ function previewBody(source: string, env: any): string {
     // engine handed that draws a syntax error instead of a diagram. Same gate
     // as `sourceLines` — additive, VS Code-only, never in the parity bytes.
     diagramSources: true,
+    // The plot renderer is not an engine and has no hook: it draws in the
+    // renderer itself, so its off switch is a plain flag rather than an absent
+    // hook. Passing `true` explicitly would be identical; passing the setting
+    // is what makes `md.diagrams.plot` mean anything.
+    plot: config.plot,
     engines: engineHooks(config),
   });
 

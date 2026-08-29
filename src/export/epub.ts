@@ -175,12 +175,18 @@ export function contentOPF(args: {
   title: string;
   identifier: string;
   modified: string;
-  units: readonly { id: string; href: string }[];
+  units: readonly { id: string; href: string; svg?: boolean }[];
   images: readonly string[];
 }): string {
   const manifest = [
+    // `properties="svg"` is required — OPF-014 — of every content document that
+    // contains an `<svg>` element, and EPUBCheck errors without it. Until the
+    // ```plot fence no EPUB this family produced had ever held one, so the
+    // property had never been needed and every item was emitted bare.
     ...args.units.map(
-      (unit) => `<item id="${unit.id}" href="${unit.href}" media-type="application/xhtml+xml"/>`,
+      (unit) =>
+        `<item id="${unit.id}" href="${unit.href}" media-type="application/xhtml+xml"` +
+        `${unit.svg === true ? ' properties="svg"' : ''}/>`,
     ),
     ...args.images.map(
       (href, index) => `<item id="img${index + 1}" href="${href}" media-type="image/png"/>`,
@@ -361,6 +367,15 @@ export interface RichRange {
  * fully escaped text (no `<` survives escaping), so the next matching close tag
  * really is the element's own.
  *
+ * `div.plot` is deliberately absent, and that is the whole EPUB story for the
+ * ```plot fence. These containers exist to photograph drawings the markup does
+ * not contain — a Mermaid `<pre>` holds diagram source, a maths span holds TeX
+ * — whereas a plot is *already* an `<svg>` element in the body this scan runs
+ * over. Measured on the default figure: 16,888 bytes of vector against a
+ * 169,108-byte PNG of the same thing, and a plot-only document never has to
+ * open a webview at all. The cost is the manifest property `svg` on any content
+ * document that holds one, which {@link contentOPF} now writes.
+ *
  * The Graphviz opener is deliberately the tag *prefix*, without its `>`:
  * the renderer writes the layout program into the tag
  * (`<div class="graphviz" data-engine="dot">`, `…"neato">`, …), so a whole-tag
@@ -493,7 +508,10 @@ export function documentEpubEntries(args: {
     title: args.title,
     identifier: stableIdentifier(args.title),
     modified: args.modified,
-    units: [{ id: 'content', href: contentHref }],
+    // The body is the finished XHTML, rich blocks already replaced by their
+    // snapshots, so an `<svg>` still in it is one the markup itself carries —
+    // today that means a ```plot fence.
+    units: [{ id: 'content', href: contentHref, svg: args.body.includes('<svg') }],
     images: args.images.map((image) => image.href),
   });
 

@@ -2,11 +2,20 @@
 //  golden.test.ts
 //  md.vscode — the fixture corpus, and the snapshot the apps never had.
 //
-//  `test/fixtures/testdata/` is a verbatim copy of `md/mdTests/TestData/`,
-//  which is itself mirrored into md.macOS and md.Android;
-//  `test/fixtures/examples/` is a verbatim copy of the documents the apps ship
-//  in their Examples menu. Both are inputs, not outputs: edit them only to
-//  match the other repos, and copy any change to all four.
+//  `test/fixtures/testdata/` mirrors `md/mdTests/TestData/`, which is itself
+//  mirrored into md.macOS and md.Android; `test/fixtures/examples/` mirrors the
+//  documents the apps ship in their Examples menu. Both are inputs, not
+//  outputs: edit them only to match the other repos, and copy any change to
+//  all four.
+//
+//  Fifteen of the sixteen fixtures are byte-identical in all four repos, and a
+//  difference in any of them is drift to be fixed. `test.md` is the deliberate
+//  exception: it is the kitchen-sink document, so it names the platform it is
+//  running on and the command that builds it — here Visual Studio Code and
+//  `npm ci && npm run compile`, in md `["iOS", "iPadOS"]` and an `xcodebuild`
+//  invocation, in md.macOS `["macOS"]` (and its own image URLs), in md.Android
+//  `["Android"]` and `./gradlew :md:assembleDebug`. Those lines are per-repo on
+//  purpose. Do not "fix" them into agreement; everything else in the file must.
 //
 //  WHY THE SNAPSHOTS EXIST
 //  -----------------------
@@ -58,7 +67,7 @@ const TESTDATA = [
 /** The app's Examples menu, in the order it shows them. */
 const EXAMPLES = [
   '01-Welcome', '02-Formatting', '03-Tables', '04-Code',
-  '05-Images', '06-Math', '07-Diagrams', '08-Writer Tools',
+  '05-Images', '06-Math', '07-Diagrams', '08-Plots', '09-Writer Tools',
 ];
 
 function read(directory: string, name: string): string {

@@ -82,7 +82,7 @@ this text is on a new line within the same paragraph.</p>
 <p>A fenced code block using tildes:</p>
 <pre><code class="language-json">{
   &quot;name&quot;: &quot;md&quot;,
-  &quot;platforms&quot;: [&quot;iOS&quot;, &quot;iPadOS&quot;],
+  &quot;platforms&quot;: [&quot;Visual Studio Code&quot;],
   &quot;dependencies&quot;: []
 }</code></pre>
 <p>A fenced block with no language:</p>
@@ -188,8 +188,7 @@ some parsers treat as a lazy continuation):</p>
 <div class="md-list"><div class="md-item" style="padding-left:0.00em"><span class="md-marker">&bull;</span><span>item one</span></div><div class="md-item" style="padding-left:0.00em"><span class="md-marker">&bull;</span><span>item two</span></div></div>
 <p>A list item containing a fenced code block:</p>
 <div class="md-list"><div class="md-item" style="padding-left:0.00em"><span class="md-marker">1.</span><span>Run the build:</span></div></div>
-<pre><code class="language-bash">xcodebuild build -project md.xcodeproj -scheme md \
-  -destination 'generic/platform=iOS'</code></pre>
+<pre><code class="language-bash">npm ci &amp;&amp; npm run compile</code></pre>
 <div class="md-list"><div class="md-item" style="padding-left:0.00em"><span class="md-marker">2.</span><span>Open a <code>.md</code> file and start editing.</span></div></div>
 <p>A blockquote that contains a table:</p>
 <blockquote>

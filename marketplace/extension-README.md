@@ -1,21 +1,21 @@
 # md for Visual Studio Code
 
-[![Marketplace](https://img.shields.io/visual-studio-marketplace/v/nettrash.md-vscode?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=nettrash.md-vscode)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/nettrash.md-vscode?label=Installs)](https://marketplace.visualstudio.com/items?itemName=nettrash.md-vscode)
-[![Rating](https://img.shields.io/visual-studio-marketplace/r/nettrash.md-vscode?label=Rating)](https://marketplace.visualstudio.com/items?itemName=nettrash.md-vscode)
+[![Marketplace](https://vsmarketplacebadges.dev/version-short/nettrash.md-vscode.svg?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=nettrash.md-vscode)
+[![Installs](https://vsmarketplacebadges.dev/installs-short/nettrash.md-vscode.svg?label=Installs)](https://marketplace.visualstudio.com/items?itemName=nettrash.md-vscode)
 [![Build](https://github.com/nettrash/md.vscode/actions/workflows/ci.yml/badge.svg)](https://github.com/nettrash/md.vscode/actions/workflows/ci.yml)
 [![License MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Markdown with mathematics, chemistry and diagrams — drawn entirely on your
-own machine, inside the preview you already use.
+Markdown with mathematics, chemistry, charts and diagrams — drawn entirely on
+your own machine, inside the preview you already use.
 
 ## What this is
 
 md is a Markdown preview for people who write documents and not only
-READMEs. Formulas and chemical equations, Mermaid flowcharts, Graphviz
-graphs, PlantUML drawings, data pasted straight out of a spreadsheet,
-footnotes, front matter and highlighted code all render as you type, and
-the finished document exports to HTML, PDF, EPUB, LaTeX or SVG.
+READMEs. Formulas and chemical equations, charts drawn from the function
+you write, Mermaid flowcharts, Graphviz graphs, PlantUML drawings, data
+pasted straight out of a spreadsheet, footnotes, front matter and
+highlighted code all render as you type, and the finished document exports
+to HTML, PDF, EPUB, LaTeX or SVG.
 
 The first thing worth knowing: it **extends VS Code's built-in Markdown
 preview** rather than opening a window of its own. *Open Preview*
@@ -26,8 +26,9 @@ Nothing asks you to lower `markdown.preview.security` either — the
 extension is built around that strict default rather than around an
 exception to it.
 
-Everything is drawn from engine files carried inside the extension. There
-is no account, no server of ours and no network round trip.
+Everything is drawn on your own machine: by engine files carried inside the
+extension, and, in the case of the charts, by the extension's own renderer.
+There is no account, no server of ours and no network round trip.
 
 ## Screenshots
 
@@ -57,6 +58,48 @@ units come with it through the bundled mhchem extension: `\ce{…}` and
 `\pu{…}` set the way a textbook would. A lone `$` in prose is left alone,
 so "$5 and $10" stays a sentence about money rather than becoming a
 formula.
+
+### Charts, from a fence
+
+A fenced ` ```plot ` block is a chart. Write `sin(x)` and you get the curve.
+`x: -10..10` sets the window and `y: auto`, which is the default, fits the
+vertical axis to what the function actually does; `title:`, `xlabel:`,
+`ylabel:`, `legend:`, `grid:`, `axes:`, `width:`, `height:` and `samples:`
+set the rest. One figure holds as many series as you like, each drawn in its
+own colour and named in the legend — `envelope = exp(-abs(x)/5)` — and a
+series can equally be a parametric curve, `(cos(t), sin(t)) for t in
+0..2*pi`, or measured numbers, `points: 0,0 1,2 2,1`. The expressions are
+ordinary arithmetic and comparisons, the trigonometric, hyperbolic and
+inverse functions, `sqrt`, `cbrt`, `abs`, `exp`, `exp2`, `ln`, `log2`,
+`log10`, `floor`, `ceil`, `round`, `atan2`, `pow` and `hypot`, and the
+constants `pi` and `e`.
+
+Nothing is bundled to draw them. The diagram engines carried inside the
+extension are megabytes of JavaScript apiece; a chart uses none of them. It
+is drawn by the extension's own renderer, in the same pass that renders the
+Markdown, so the engine files shipped here are exactly the files that were
+there before charts existed. That is also what settles where a chart runs.
+Graphviz is WebAssembly and has to be laid out in the extension host, where
+it takes a moment to compile before the first graph appears; Mermaid and
+PlantUML are scripts that run in the page itself. A chart is neither, so the
+preview is handed a finished drawing rather than something that has to draw
+one — nothing to fetch, nothing to warm up, nothing to fall back to, and no
+script in the page for the preview's default security to allow or refuse.
+
+Being a drawing from the outset is also why a chart survives the trip out of
+the document. It is vector in the preview, in the self-contained HTML, in
+the PDF and in an exported EPUB — the first vector figure md has put into a
+book on any of its platforms, where every other rich block is a picture —
+and *Export Diagram as SVG…* offers it beside the diagrams. LaTeX is the
+exception: a `.tex` file cannot take a vector drawing without a conversion
+step it has no way to carry, so a chart travels there as the source you
+wrote, under a comment, exactly as a Mermaid, Graphviz or PlantUML block
+does.
+
+A block that cannot be read keeps its own source on the page under a single
+`plot: …` line saying what is wrong — an unknown function, a range that does
+not increase, a bracket that was never closed. Never a hole, never an error
+box.
 
 ### Mermaid
 
@@ -134,10 +177,13 @@ nothing beside it — diagrams as drawings, formulas as selectable text.
 at a print-on-demand trim size (6 × 9″, 5 × 8″, 5.5 × 8.5″).
 *Export as EPUB…* builds an e-book whose table of contents is the
 document's own headings, with an identifier derived from the title, so
-re-exporting updates the reader's copy instead of stacking up beside it.
-*Export as LaTeX…* writes `.tex` in which your mathematics is still the
-`$…$` you typed rather than a picture of it. *Export Diagram as SVG…*
-saves one diagram as a real vector file.
+re-exporting updates the reader's copy instead of stacking up beside it —
+and a chart travels into that book as vector, while a diagram arrives as a
+picture. *Export as LaTeX…* writes `.tex` in which your mathematics is still
+the `$…$` you typed rather than a picture of it; a diagram or a chart
+travels as the source you wrote, under a comment naming its language.
+*Export Diagram as SVG…* saves one diagram, or one chart, as a real vector
+file.
 
 ## Commands
 
@@ -149,7 +195,7 @@ All six appear in the Command Palette under the **md** category.
 | **md: Export as PDF…** | The rendered document as a PDF, at the size in `md.export.pageSize` | a Markdown editor is active |
 | **md: Export as EPUB…** | An e-book with the document's headings as its contents | a Markdown editor is active |
 | **md: Export as LaTeX…** | `.tex` source, mathematics kept as mathematics | a Markdown editor is active |
-| **md: Export Diagram as SVG…** | One Mermaid, Graphviz or PlantUML diagram as a vector file | a Markdown, PlantUML or Graphviz editor is active |
+| **md: Export Diagram as SVG…** | One Mermaid, Graphviz or PlantUML diagram, or one chart, as a vector file | a Markdown, PlantUML or Graphviz editor is active |
 | **md: Preview Diagram** | Opens the diagram panel beside a diagram file | a PlantUML or Graphviz editor is active |
 
 Mathematics is not on the SVG list, because KaTeX sets a formula as HTML
@@ -169,11 +215,15 @@ workspace or for one folder.
 | `md.diagrams.mermaid` | `true` | Render ` ```mermaid ` blocks |
 | `md.diagrams.graphviz` | `true` | Render ` ```dot `, ` ```graphviz `, ` ```gv ` and the layout-named fences |
 | `md.diagrams.plantuml` | `true` | Render ` ```plantuml ` and ` ```puml ` blocks |
+| `md.diagrams.plot` | `true` | Draw ` ```plot ` blocks as charts |
 | `md.highlight.enabled` | `true` | Syntax-highlight fenced code blocks that name a language |
 | `md.export.pageSize` | `A4` | Page size for PDF export: `A4`, `A5`, `Letter`, `Legal`, `6x9`, `5x8`, `5.5x8.5` |
 
 Turning an engine off leaves the block readable as the source you wrote.
-It is never blank and never an error box.
+It is never blank and never an error box. Charts are the odd one out among
+those switches: there is no engine behind them, so turning
+`md.diagrams.plot` off loads nothing less — it is there for when the numbers
+behind a figure are what you would rather read.
 
 ## Themeing
 
@@ -229,6 +279,13 @@ Said plainly, because each one is a decision rather than an oversight.
   document before any colouring is applied, on every platform md ships on.
 - **An author note is hidden only on a line of its own.** Written inline,
   it renders.
+- **View modes belong to VS Code, not to md.** The iPhone, iPad, Mac and
+  Android apps remember whether each file was last open in the editor,
+  the preview or a split, because they own their whole window. Here the
+  editor owns it: *Open Preview* and *Open Preview to the Side* place the
+  preview, **View: Toggle Editor Group Layout** rearranges the columns,
+  and VS Code restores your groups and tabs itself. md keeps no memory of
+  its own, adds no setting for one and opens no preview uninvited.
 
 ## What changed
 

@@ -263,6 +263,29 @@ describe('rich containers', () => {
     expect(html).not.toContain('<b>hi</b>');
   });
 
+  // The plot fence is the one rich container with no engine behind it: the
+  // renderer draws it here, in the host, so the container arrives holding a
+  // finished <svg> rather than the source an engine will replace later.
+  it('emits a plot container holding a finished svg', () => {
+    const html = body(doc('```plot', 'x: -1..1', 'sin(x)', '```'));
+    expect(html.startsWith('<div class="plot"><svg ')).toBe(true);
+    expect(html.endsWith('</svg></div>')).toBe(true);
+    expect(html).toContain('viewBox="0 0 600 400"');
+    expect(html).not.toContain('<pre><code>');
+  });
+
+  it('keeps a broken or switched-off plot readable as its own source', () => {
+    // The family rule for every rich block: never a hole, never an error box.
+    expect(body(doc('```plot', 'sinc(x)', '```'))).toBe(
+      "<div class=\"plot\"><pre>plot: unknown function 'sinc'\nsinc(x)</pre></div>",
+    );
+    // `md.diagrams.plot`, off: the container stays and the source shows, which
+    // is what every other engine's off switch does.
+    expect(body(doc('```plot', 'sin(x)', '```'), { plot: false })).toBe(
+      '<div class="plot"><pre>sin(x)</pre></div>',
+    );
+  });
+
   // Swift: testHTMLMathFenceEmitsDisplayMath
   it('emits a display-math div for a math fence', () => {
     // Note the shape: a fence is a `<div>` while `$$…$$` inside a paragraph is
@@ -284,15 +307,29 @@ describe('rich containers', () => {
   });
 
   // Swift: testHTMLBareFenceAndSpecialFencesAreNotHighlighted
-  it('leaves a bare fence bare', () => {
+  it('leaves a bare fence bare, and never highlights a special one', () => {
     const html = body(doc('```', 'plain text', '```'));
     expect(html).toBe('<pre><code>plain text</code></pre>');
     expect(html).not.toContain('language-');
+    // The enumerated list, which `plot` now joins: each of these is claimed by
+    // a richer renderer before the code branch is reached, so none of them may
+    // ever come back as highlightable source.
+    for (const [language, source] of [
+      ['mermaid', 'graph TD'],
+      ['plantuml', '@startuml'],
+      ['dot', 'digraph {}'],
+      ['csv', 'a,b'],
+      ['math', 'x^2'],
+      ['plot', 'sin(x)'],
+    ]) {
+      expect(body(doc('```' + language, source, '```')), language).not.toContain('language-');
+    }
   });
 
   it('resolves the info word case-insensitively for every rich language', () => {
     expect(body(doc('```MERMAID', 'graph TD', '```'))).toContain('<pre class="mermaid">');
     expect(body(doc('```DOT', 'digraph {}', '```'))).toContain('data-engine="dot"');
+    expect(body(doc('```PLOT', 'sin(x)', '```'))).toContain('<div class="plot"><svg ');
   });
 });
 
@@ -330,6 +367,12 @@ describe('engine gating', () => {
     expect(needs(doc('```dot', 'digraph {}', '```'))).toEqual({ ...off, graphviz: true });
     expect(needs(doc('```swift', 'let x = 1', '```'))).toEqual({ ...off, highlight: true });
     expect(needs(doc('```csv', 'a,b', '1,2', '```'))).toEqual(off);
+    // The negative-gating row that matters most: the class is exactly `plot`,
+    // which matches none of the five probes, so a plot-only document loads no
+    // engine at all — and highlight.js least of all, because the container is
+    // not a `<pre><code class="language-`.
+    expect(needs(doc('```plot', 'sin(x)', '```'))).toEqual(off);
+    expect(needs(doc('```plot', 'sinc(x)', '```'))).toEqual(off);
   });
 
   it('pulls the engine in for a diagram nested inside a block quote', () => {
@@ -407,6 +450,16 @@ describe('engine gating', () => {
       expect(html, engine).not.toContain(engine);
     }
     expect(html).toContain('rich/md-init.js');
+  });
+
+  it('leaves a document of nothing but plots light too', () => {
+    // The whole point of a renderer with no engine behind it: a page of
+    // figures fetches nothing, in the preview and in the export alike.
+    const html = renderDocument(doc('```plot', 'sin(x)', '```'), { title: 't', dark: false });
+    for (const engine of ['katex.min.js', 'mermaid.min.js', 'viz-global.js', 'highlight.min.js']) {
+      expect(html, engine).not.toContain(engine);
+    }
+    expect(html).toContain('<svg ');
   });
 });
 

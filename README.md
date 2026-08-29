@@ -79,6 +79,26 @@ code).
   in prose is left alone: `$5 and $10` is a sentence about money, not a
   formula, which is why the auto-render pass every other Markdown
   extension uses is deliberately not loaded.
+- **Charts from a fence.** A ` ```plot ` block is a chart:
+  `sin(x) * exp(-abs(x)/5)` draws the curve, `x: -10..10` sets the
+  window, `y: auto` fits it to the function, and `title:`, `xlabel:`,
+  `ylabel:`, `legend:`, `grid:`, `axes:`, `width:`, `height:` and
+  `samples:` set the rest. One block may hold several series
+  (`envelope = exp(-abs(x)/5)` names one for the legend), parametric
+  curves (`(cos(t), sin(t)) for t in 0..2*pi`) and measured points
+  (`points: 0,0 1,2 2,1`). The expression language is the one the
+  plotter on [nettrash.me](https://nettrash.me) speaks — `pi` and `e`,
+  the trigonometric, hyperbolic, logarithmic and rounding functions,
+  `atan2`, `pow`, `hypot`, comparisons and the Boolean operators, so
+  `(x > 0) * sqrt(x)` is a half-domain curve. **It is not an engine**:
+  the renderer is a hand-written pure function, nothing is vendored for
+  it and nothing is fetched, so a chart is already an `<svg>` in the page
+  — which is why it travels intact into the self-contained HTML, print,
+  PDF, EPUB and *Export Diagram as SVG…* without a rasterisation step,
+  and why a document of nothing but charts loads no engine at all. Its
+  ink is `currentColor`, so one figure is right on light paper, on dark
+  paper and in print; only the curves carry a colour. A block that
+  cannot be read keeps its source under one `plot: …` line.
 - **Diagram files preview as diagrams.** A `.puml` / `.plantuml` /
   `.iuml` / `.pu` file, or a `.gv` / `.dot` one, opens as its own
   language with *Preview Diagram* in the editor title bar, and renders as
@@ -131,7 +151,10 @@ code).
   `md.diagrams.mermaid`, `md.diagrams.graphviz`, `md.diagrams.plantuml`
   and `md.highlight.enabled` each turn one of them off for a workspace or
   a folder, and a block whose engine is off stays readable as the source
-  you wrote — never blank, and never an error box.
+  you wrote — never blank, and never an error box. `md.diagrams.plot`
+  joins them and is the odd one out: there is no engine behind a chart,
+  so turning it off loads nothing less — it is there for when the numbers
+  behind a figure are what you want to read.
 
 ## Platform
 
@@ -140,6 +163,19 @@ code).
   extension host and read their files from disk, which the browser
   extension host cannot do — so there is no `vscode.dev` build rather
   than a `vscode.dev` build that silently renders half a document.
+- **No view-mode memory, on purpose.** The iPhone, iPad, Mac and Android
+  apps remember whether each file was last open in the editor, the
+  preview or a split, because those apps own their whole window and
+  something there has to decide. Here VS Code decides, and has since
+  before this extension existed: *Open Preview* (`markdown.showPreview`)
+  and *Open Preview to the Side* (`markdown.showPreviewToSide`) put the
+  preview where you want it, **View: Toggle Editor Group Layout**
+  rearranges the columns, and the editor restores the groups and tabs you
+  left open when the window comes back. So this port keeps no memory of
+  its own, adds no setting for one and auto-opens nothing — not a gap in
+  the port but the same decision the preview itself rests on: a document
+  should render the same however you opened it, and where you opened it
+  is yours.
 - **PDF is the one export without byte parity**, and deliberately so: the
   apps paginate through WebKit and this port cannot, and American
   Typewriter does not exist away from Apple, so the glyphs themselves

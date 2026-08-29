@@ -95,6 +95,12 @@ export interface MdConfig {
   readonly mermaid: boolean;
   readonly graphviz: boolean;
   readonly plantuml: boolean;
+  /**
+   * `md.diagrams.plot`. Unlike its four neighbours this gates no engine —
+   * the plot renderer is a pure function in `src/render/**` — so switching it
+   * off costs nothing and only leaves the fence's source visible.
+   */
+  readonly plot: boolean;
   readonly highlight: boolean;
   readonly pageSize: PageSizeId;
 }
@@ -148,6 +154,7 @@ export function readConfig(resource?: vscode.Uri): MdConfig {
     mermaid: c.get<boolean>('diagrams.mermaid') !== false,
     graphviz: c.get<boolean>('diagrams.graphviz') !== false,
     plantuml: c.get<boolean>('diagrams.plantuml') !== false,
+    plot: c.get<boolean>('diagrams.plot') !== false,
     highlight: c.get<boolean>('highlight.enabled') !== false,
     pageSize: pageSize(c.get<string>('export.pageSize')),
   };
