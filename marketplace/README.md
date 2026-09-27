@@ -73,21 +73,21 @@ Preview*. Keep the window near the width of the existing images so the
 three sit together on the page.
 
 **The captions in `extension-README.md` name what is in frame, so they
-have to be retaken and rewritten together.** As of 1.2 the images predate
+have to be retaken and rewritten together.** As of 1.5 the images predate
 the plot fence: the listing describes charts and the screenshots do not
 show one. The captions are accurate for the images that exist today and
 must be corrected in the same commit that replaces them — a caption
 promising a chart over a picture without one is the failure mode this
 paragraph exists to prevent.
 
-| Source | Marketplace field | Limit | Current (1.0.0) |
+| Source | Marketplace field | Limit | Current (1.5.0) |
 | --- | --- | --- | --- |
 | `package.json` `publisher` + `name` | Unique identifier | lowercase, no spaces | `nettrash.md-vscode` |
 | `package.json` `displayName` | Extension name | not published | `md` (2) |
-| `package.json` `description` | One-line description under the name | not published | 142 |
-| `package.json` `version` | Version | must be `major.minor.patch` | `1.0.0` |
+| `package.json` `description` | One-line description under the name | not published | 203 |
+| `package.json` `version` | Version | must be `major.minor.patch` | `1.5.0` |
 | `package.json` `categories` | Categories | fixed vocabulary | 3 |
-| `package.json` `keywords` | Tags, used by search | not published | 5 |
+| `package.json` `keywords` | Tags, used by search | not published | 14 |
 | `package.json` `galleryBanner` | Banner behind the name | — | `#2B221C`, dark |
 | `media/icon.png` | Icon | 128 × 128 recommended | 512 × 512, 134 KB |
 | `marketplace/extension-README.md`, packaged as `README.md` | Details tab | none in practice | the whole file |
@@ -115,6 +115,104 @@ What *is* certain and already checked: the version is strict three-part
 semver, the three categories come from the Marketplace's fixed list
 (Programming Languages, Visualization, Formatters), and `vsce package`
 refuses the manifest outright if either is wrong.
+
+## The second registry: Open VSX
+
+The Marketplace is Microsoft's, and its terms of use allow only
+Microsoft's own products to install from it. So every other editor built
+on VS Code — **Cursor, Windsurf, VSCodium, Gitpod, Eclipse Theia** —
+reads a different registry, [open-vsx.org](https://open-vsx.org), run by
+the Eclipse Foundation. The same `.vsix` goes to both; nothing is built
+twice and nothing about the extension changes.
+
+**The namespace is claimed; nothing is published there yet.** nettrash
+created the Eclipse account, signed the publisher agreement, generated a
+token and claimed `nettrash` on 2026-09-23 — confirmed live:
+`https://open-vsx.org/api/nettrash` answers
+`{"extensions":{},"name":"nettrash","verified":false}`, so the namespace
+exists, holds no extension, and is not yet ownership-verified (a separate
+Eclipse request). `open-vsx.org/extension/nettrash/md-vscode` still
+returns 404. Claiming it early was the point: a namespace nobody has
+claimed is a namespace anybody can claim, and Open VSX has had malware
+uploaded to it under borrowed names.
+
+### What is already done, here in the repository
+
+- `ovsx` is in `devDependencies`, pinned to the **0.10** line. The 1.x
+  releases require Node 22 or newer and this repository pins Node 20 —
+  the major the oldest supported extension host runs — so the 0.10 line
+  is the one that matches. Revisit the pin when the Node floor moves.
+- `npm run publish:vsix` (`scripts/publish.mjs`) publishes **one built
+  `.vsix` by path** to both registries — `vsce publish --packagePath` and
+  `ovsx publish --packagePath`, never the bare verbs, for exactly the
+  reason `scripts/prepublish.mjs` refuses a direct `vsce package`: either
+  tool, given no file, will package the working tree and ship the
+  repository README as the listing. A registry whose token is missing is
+  skipped with a line saying so.
+- `.github/workflows/ci.yml` has a `publish` job that runs **only on a
+  `v*.*.*` tag**, only after Build and Test has passed, only if the tag
+  matches `package.json`, and only if **both** secrets exist. Until they
+  do it prints one notice and stops. Nothing needs to be enabled or
+  uncommented on the day the tokens arrive.
+
+### The five steps only nettrash can take
+
+These need an account and a signature, so they cannot be scripted. They
+are done once, in this order. Check the wording against the current
+Eclipse and Open VSX documentation as you go — this list is written from
+the published instructions, not from a walk-through of the live forms.
+
+1. **Create an Eclipse account** at `accounts.eclipse.org`. The address
+   on it is the one the publisher agreement is signed under; use
+   `nettrash@nettrash.me`, the identity every other listing in the family
+   carries.
+2. **Sign the Eclipse Foundation Open VSX Publisher Agreement**, from the
+   Eclipse account profile page. Publishing is refused outright until it
+   is signed, and the refusal names the agreement, so this is the step
+   that is noticed rather than the one that is missed.
+3. **Create an access token** on `open-vsx.org` — log in with the Eclipse
+   account, then *Settings → Access Tokens → Generate New Token*. It is
+   shown **once**; copy it then.
+4. **Claim the namespace**, once, with that token. ~~Done 2026-09-23.~~
+
+   ```bash
+   OVSX_PAT=<token> npx ovsx create-namespace nettrash
+   OVSX_PAT=<token> npx ovsx verify-pat nettrash
+   ```
+
+   The second line is the one worth keeping: it answers, in one call,
+   whether the namespace exists and whether this token may publish into
+   it. `scripts/publish.mjs` runs it before every upload for that reason,
+   and it is the way to re-check the token after this first claim.
+5. **Add the two repository secrets** — *Settings → Secrets and variables
+   → Actions* on GitHub: `OVSX_PAT` with the token from step 3, and
+   `VSCE_PAT` with the Marketplace personal access token. The publish job
+   stays inert until **both** are present; it does not publish to one
+   registry and skip the other, because two registries holding two
+   different builds of one version number is worse than neither holding
+   it.
+
+A claimed namespace is still an *unverified* one: Open VSX shows a
+warning on the listing until ownership is verified, which is a separate
+request to the Open VSX maintainers. Worth doing, and not a blocker for
+the first publish.
+
+### Check the first listing by eye
+
+**Open VSX renders the README and the CHANGELOG out of the `.vsix`**,
+exactly as the Marketplace does — which means it renders
+`marketplace/extension-README.md`, standing in as `README.md`, with the
+relative links `vsce` has already rewritten to raw `github.com` URLs on
+the repository's branch. Two consequences, and both have to be looked at
+rather than assumed:
+
+- **The screenshots must be committed and pushed first**, or the page
+  publishes with three holes in it — on *both* registries, from the same
+  rewritten URLs.
+- **The rendering is not the Marketplace's.** Same Markdown, different
+  renderer and a different sanitiser, so the badges, the tables and the
+  headings have to be read once on the live page. There is no Promotional
+  Text here either: correcting a word means publishing a version.
 
 ## What the page will and will not render
 
@@ -167,8 +265,10 @@ this goes wrong, whichever store it is.
   simplest Markdown preview" is the family's one superlative and it stays
   there, where it is not store copy.
 - The App Store's "do not name another platform" rule is **Apple's, and
-  does not travel here**. The details tab names the iPhone, iPad, Mac and
-  Android siblings and links to them, because they are one product and a
+  does not travel here**. The details tab names the iPhone, iPad, Mac,
+  Windows and Android siblings and links to them — to their stores where
+  the store page is public (App Store, Microsoft Store), and to their
+  source otherwise, because they are one product and a
   reader deciding whether to install is better off knowing it. What must
   still be said is *where* they are the same — see the parity bullet
   below.

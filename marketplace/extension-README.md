@@ -123,6 +123,18 @@ A fenced ` ```plantuml ` or ` ```puml ` block draws the UML family and the
 good deal more PlantUML can draw beside it: sequence, class, component,
 activity, state, mind maps, work breakdowns and Gantt charts.
 
+One boundary is worth knowing before you meet it. PlantUML lays some
+diagrams out itself and hands the rest to Graphviz, and Graphviz is
+WebAssembly, which VS Code's built-in Markdown preview forbids. So in the
+**preview** you get sequence diagrams, the modern activity syntax
+(`start` / `if` / `stop`), mind maps, Gantt charts, WBS, JSON, YAML, salt
+wireframes and timing diagrams; class, state, component, object,
+use-case, deployment and ER diagrams — and the legacy `(*) -->` activity
+syntax — show their source instead, after a pause. They are not lost:
+**md: Preview Diagram** draws them in md's own panel, and every export —
+HTML, PDF, EPUB, SVG — draws them too, because those render in a webview
+this extension owns and can allow WebAssembly in.
+
 ### CSV and TSV blocks
 
 A fenced ` ```csv ` or ` ```tsv ` block is drawn as a table, quoted fields
@@ -170,6 +182,13 @@ Diagram** button in the editor title bar. The panel beside it shows the
 diagram the file describes and follows every edit, while the source stays
 fully editable.
 
+Markdown files stay VS Code's own. The built-in `markdown` language opens
+`.md`, `.markdown`, `.mdown`, `.markdn`, `.mdtext`, `.mdtxt`, `.mkd` and
+`.mdwn`; md adds `.mkdn` and `.mkdown` to that same language rather than to
+one of its own, so every spelling the iPhone, iPad, Mac, Windows and Android
+apps open opens here too — in the preview you already use, with the same
+commands, and with nothing about how a `.md` file behaves changed.
+
 ### Exports
 
 *Export as HTML…* writes one self-contained file that opens anywhere with
@@ -186,18 +205,72 @@ travels as the source you wrote, under a comment naming its language.
 *Export Diagram as SVG…* saves one diagram, or one chart, as a real vector
 file.
 
+All of them are on the right-click menu as well as in the Command
+Palette: **md: Export** opens as a submenu on a Markdown file in the
+Explorer, in the editor and on the editor tab, with the two diagram
+commands beside it on a `.puml` or `.gv` file. The menu hands the
+command the file you clicked, so the export is of that file rather than
+of whatever editor happened to be focused — and of the unsaved text when
+the file is open.
+
+### A folder of Markdown at once
+
+Select several Markdown files in the Explorer and *HTML*, *EPUB* or
+*LaTeX* exports all of them: one question — which folder — then a
+cancellable progress notification counting through the files, and one
+line at the end saying how many landed, naming any that failed and any
+non-Markdown file that was skipped. Each export takes its own source
+file's name, so `notes.md` becomes `notes.html`, and a name already
+taken in the destination takes a `-2` rather than overwriting what is
+there.
+
+**PDF is the one export that stays single-file.** It writes no bytes
+itself — it hands a print-ready page to the host's print dialogue, where
+you choose *Save as PDF* and a destination — so it is not offered for a
+multi-selection, and exports one document at a time from the same menu.
+
+### Where md's Markdown differs from GitHub's, said out loud
+
+The renderer is a deliberate subset — see **Known limitations** — which
+means a document written for GitHub can render differently here with
+nothing to warn you. Now it warns you: a faint underline and a row in the
+Problems pane, at **Information** level and never higher, because the
+Markdown is not wrong, it will simply look different.
+
+Five rules, each naming what md does instead: tags written as markup
+(escaped, so they show as the characters you typed), reference-style
+links and their definition lines (printed as written, both halves), a
+four-space indented block (a paragraph here, not code), a table written
+straight under a paragraph without the blank line md needs, and a
+footnote nothing cites — printed at the foot here, printed nowhere at
+all by a CommonMark engine.
+
+Two of them come with a quick fix, and only two: fencing an indented
+block and inserting the blank line above a table are rearrangements with
+no judgement in them. Which address a reference link meant is a question
+only you can answer, so nothing guesses at it.
+
+It reads the document in your editor and nothing else, using the same
+parser the preview renders with — so a less-than sign in a sentence is
+not a tag, an example shown inside backticks is not a tag, an indented
+paragraph under a list item is not a code block, a footnote defined at
+the foot of the file is cited, and `[^a-z]` in a sentence about regular
+expressions is a character class rather than a citation. Switch it off entirely with
+`md.lint.dialect`, or one rule at a time with `md.lint.rules`.
+
 ## Commands
 
-All six appear in the Command Palette under the **md** category.
+All six appear in the Command Palette under the **md** category, and in
+the context menus below.
 
 | Command | What it does | Offered when |
 | --- | --- | --- |
-| **md: Export as HTML…** | One self-contained `.html` file, engines and fonts included | a Markdown editor is active |
-| **md: Export as PDF…** | The rendered document as a PDF, at the size in `md.export.pageSize` | a Markdown editor is active |
-| **md: Export as EPUB…** | An e-book with the document's headings as its contents | a Markdown editor is active |
-| **md: Export as LaTeX…** | `.tex` source, mathematics kept as mathematics | a Markdown editor is active |
-| **md: Export Diagram as SVG…** | One Mermaid, Graphviz or PlantUML diagram, or one chart, as a vector file | a Markdown, PlantUML or Graphviz editor is active |
-| **md: Preview Diagram** | Opens the diagram panel beside a diagram file | a PlantUML or Graphviz editor is active |
+| **md: Export as HTML…** | One self-contained `.html` file, engines and fonts included | a Markdown editor is active, or Markdown files are selected — in batch too |
+| **md: Export as PDF…** | The rendered document as a PDF, at the size in `md.export.pageSize` | a Markdown editor is active, or one Markdown file is selected |
+| **md: Export as EPUB…** | An e-book with the document's headings as its contents | a Markdown editor is active, or Markdown files are selected — in batch too |
+| **md: Export as LaTeX…** | `.tex` source, mathematics kept as mathematics | a Markdown editor is active, or Markdown files are selected — in batch too |
+| **md: Export Diagram as SVG…** | One Mermaid, Graphviz or PlantUML diagram, or one chart, as a vector file | a Markdown, PlantUML or Graphviz editor is active, or one diagram file is selected |
+| **md: Preview Diagram** | Opens the diagram panel beside a diagram file | a PlantUML or Graphviz editor is active, or one diagram file is selected |
 
 Mathematics is not on the SVG list, because KaTeX sets a formula as HTML
 and text and there is no vector drawing to hand over.
@@ -219,10 +292,14 @@ workspace or for one folder.
 | `md.diagrams.plot` | `true` | Draw ` ```plot ` blocks as charts |
 | `md.highlight.enabled` | `true` | Syntax-highlight fenced code blocks that name a language |
 | `md.export.pageSize` | `A4` | Page size for PDF export: `A4`, `A5`, `Letter`, `Legal`, `6x9`, `5x8`, `5.5x8.5` |
+| `md.lint.dialect` | `true` | Point out, at Information level, where md's Markdown differs from GitHub's |
+| `md.lint.rules` | *(all on)* | Which of the five differences are reported: `rawHtml`, `referenceLink`, `indentedCode`, `tableAfterParagraph`, `footnote` |
 
 Turning an engine off leaves the block readable as the source you wrote.
-It is never blank and never an error box. Charts are the odd one out among
-those switches: there is no engine behind them, so turning
+It is never blank and never an error box — and the engine itself is never
+fetched, so a document full of PlantUML with `md.diagrams.plantuml` off
+costs the preview nothing rather than 7.4 MB. Charts are the odd one out
+among those switches: there is no engine behind them, so turning
 `md.diagrams.plot` off loads nothing less — it is there for when the numbers
 behind a figure are what you would rather read.
 
@@ -272,7 +349,10 @@ Said plainly, because each one is a decision rather than an oversight.
   apps' renderer and inherits their omissions on purpose: raw HTML is
   escaped rather than passed through, so tags render as the characters you
   typed, there are no reference-style links, and a four-space indent
-  continues a paragraph rather than starting a code block.
+  continues a paragraph rather than starting a code block. None of that
+  is going to change — but the extension no longer leaves you to find it
+  out from the preview: `md.lint.dialect` reports each of them where it
+  is written, at Information level.
 - **PDF output is not byte-identical to the apps'.** Same page sizes, same
   margins, same content, a different rasterizer — and American Typewriter
   does not exist away from Apple, so the glyphs themselves differ.
@@ -280,13 +360,14 @@ Said plainly, because each one is a decision rather than an oversight.
   document before any colouring is applied, on every platform md ships on.
 - **An author note is hidden only on a line of its own.** Written inline,
   it renders.
-- **View modes belong to VS Code, not to md.** The iPhone, iPad, Mac and
-  Android apps remember whether each file was last open in the editor,
-  the preview or a split, because they own their whole window. Here the
-  editor owns it: *Open Preview* and *Open Preview to the Side* place the
-  preview, **View: Toggle Editor Group Layout** rearranges the columns,
-  and VS Code restores your groups and tabs itself. md keeps no memory of
-  its own, adds no setting for one and opens no preview uninvited.
+- **View modes belong to VS Code, not to md.** The iPhone, iPad, Mac,
+  Windows and Android apps remember whether each file was last open in
+  the editor, the preview or a split, because they own their whole
+  window. Here the editor owns it: *Open Preview* and *Open Preview to
+  the Side* place the preview, **View: Toggle Editor Group Layout**
+  rearranges the columns, and VS Code restores your groups and tabs
+  itself. md keeps no memory of its own, adds no setting for one and
+  opens no preview uninvited.
 
 ## What changed
 
@@ -295,12 +376,31 @@ Every release is listed in the **Changelog** tab of this page, and in
 
 ## The rest of the family
 
-md is also a native app elsewhere, sharing this renderer and these export
-formats:
+md is also a native app on four other platforms, sharing this renderer —
+the same mathematics, diagrams and charts — and these export formats.
 
-- [md for iPhone and iPad](https://github.com/nettrash/md)
-- [md for macOS](https://github.com/nettrash/md.macOS)
-- [md for Android](https://github.com/nettrash/md.Android)
+### md for Windows
+
+A Markdown editor and live previewer for Windows 11, on x64 and ARM64,
+from the [Microsoft Store](https://apps.microsoft.com/detail/9N2CV7L976RL).
+Write on one side and watch the finished page take shape on the other, in
+Edit, Split and Preview layouts, with a Zen mode that gives your text the
+whole screen. The page is this extension's page — LaTeX and chemistry,
+Mermaid, Graphviz and PlantUML, plots — drawn offline on your PC. Print it,
+export it as PDF, HTML, EPUB, LaTeX or a TextBundle, or compile a folder of
+chapters into one book. It opens every spelling of Markdown this extension
+does, saves in place as you write, and has no accounts, no analytics and
+no tracking. The source is at
+[github.com/nettrash/md.win](https://github.com/nettrash/md.win).
+
+### iPhone, iPad, Mac and Android
+
+- **md for iPhone, iPad and Mac** is on the
+  [App Store](https://apps.apple.com/app/nettrash-md/id6785397346); the
+  source is at [github.com/nettrash/md](https://github.com/nettrash/md) and
+  [github.com/nettrash/md.macOS](https://github.com/nettrash/md.macOS).
+- **md for Android**: the source is at
+  [github.com/nettrash/md.Android](https://github.com/nettrash/md.Android).
 
 Questions and bug reports are welcome at
 [github.com/nettrash/md.vscode/issues](https://github.com/nettrash/md.vscode/issues).

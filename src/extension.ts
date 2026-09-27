@@ -24,33 +24,22 @@
 
 import * as vscode from 'vscode';
 
+//
+//  The six commands declared in `package.json`, the two arguments a menu
+//  passes them, and the batch export one of those arguments makes possible,
+//  all live in `./commands` — which is also the only place that catches what
+//  the export layer throws and turns it into a message the author can read.
+//
+import { registerCommands } from './commands';
 import { warmUp } from './engines/graphviz';
 import { setRichRoot } from './engines/paths';
 //
-//  The six commands declared in `package.json` delegate straight into the
-//  export layer. The contract this file compiles against is one function per
-//  command, each taking the document to work on and doing its own file
-//  dialogue and its own writing:
+//  The dialect lint: an Information-level diagnostic wherever md's deliberate
+//  subset renders a document differently from the engine it was written for.
+//  It owns a `DiagnosticCollection` and a debounce timer per document, which
+//  is why it has a `dispose` of its own beside the subscriptions.
 //
-//      export function exportHtml(document: vscode.TextDocument): Promise<void>;
-//      export function exportPdf(document: vscode.TextDocument): Promise<void>;
-//      export function exportEpub(document: vscode.TextDocument): Promise<void>;
-//      export function exportLatex(document: vscode.TextDocument): Promise<void>;
-//      export function exportSvg(document: vscode.TextDocument): Promise<void>;
-//      export function showDiagramPreview(document: vscode.TextDocument): Promise<void>;
-//
-//  Errors are thrown, not swallowed: `runOnDocument` below turns them into a
-//  message the author can read, which is the one thing a silent export must
-//  never do.
-//
-import {
-  exportEpub,
-  exportHtml,
-  exportLatex,
-  exportPdf,
-  exportSvg,
-  showDiagramPreview,
-} from './export/index';
+import { disposeDialectLint, registerDialectLint } from './lint/diagnostics';
 import { richDirectory } from './preview/assets';
 import { affectsPreview, readConfig } from './preview/config';
 import { disposeDiagramPreviews, registerDiagramPreviews } from './preview/diagramPreview';
@@ -75,6 +64,12 @@ export function activate(context: vscode.ExtensionContext): MdApi {
   // rather than lazily on the first preview so that everything they own is in
   // `context.subscriptions` from the start.
   registerDiagramPreviews(context);
+
+  // The Markdown-dialect lint. Its diagnostic collection, its listeners and
+  // its code-action provider all go into `context.subscriptions`; the one
+  // thing VS Code cannot dispose for us is a debounce timer still counting
+  // down, hence `disposeDialectLint` in `deactivate` below.
+  registerDialectLint(context);
 
   context.subscriptions.push(
     // The palette, the two font stacks and `data-md-dark` are baked into the
@@ -112,74 +107,11 @@ export function deactivate(): void {
   // belt to that pair of braces, for the shutdown orders in which `deactivate`
   // runs first. It is idempotent.
   disposeDiagramPreviews();
-}
 
-// MARK: - Commands
-
-type DocumentCommand = (document: vscode.TextDocument) => void | Promise<void>;
-
-/** Languages a command may run against, in the order we would rather find them. */
-const SUPPORTED_LANGUAGES: readonly string[] = ['markdown', 'plantuml', 'graphviz'];
-
-function registerCommands(context: vscode.ExtensionContext): void {
-  const commands: ReadonlyArray<readonly [string, DocumentCommand]> = [
-    ['md.exportHtml', exportHtml],
-    ['md.exportPdf', exportPdf],
-    ['md.exportEpub', exportEpub],
-    ['md.exportLatex', exportLatex],
-    ['md.exportSvg', exportSvg],
-    ['md.showDiagramPreview', showDiagramPreview],
-  ];
-
-  for (const [id, run] of commands) {
-    context.subscriptions.push(
-      vscode.commands.registerCommand(id, () => runOnDocument(id, run)),
-    );
-  }
-}
-
-async function runOnDocument(id: string, run: DocumentCommand): Promise<void> {
-  const document = targetDocument();
-  if (!document) {
-    void vscode.window.showWarningMessage(
-      'md: open a Markdown, PlantUML or Graphviz file first.',
-    );
-    return;
-  }
-
-  try {
-    await run(document);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`[md] ${id} failed`, err);
-    void vscode.window.showErrorMessage(`md: ${id} failed — ${message}`);
-  }
-}
-
-/**
- * The document a command should act on.
- *
- * `activeTextEditor` is the obvious answer and the usual one, but it is
- * `undefined` whenever the focus sits in a webview — which includes the
- * Markdown preview, the very place from which someone is most likely to reach
- * for "Export as PDF". Falling back to a visible editor of a language we
- * understand turns that from a puzzling refusal into the expected result.
- */
-function targetDocument(): vscode.TextDocument | undefined {
-  // Whatever the author has focused wins, whatever its language: the menu
-  // `when` clauses already decide where these commands are offered, and
-  // second-guessing them here would refuse a `.txt` file somebody is
-  // deliberately treating as Markdown.
-  const active = vscode.window.activeTextEditor?.document;
-  if (active) return active;
-
-  for (const language of SUPPORTED_LANGUAGES) {
-    const visible = vscode.window.visibleTextEditors.find(
-      (editor) => editor.document.languageId === language,
-    );
-    if (visible) return visible.document;
-  }
-  return undefined;
+  // And the lint's debounce timers, for the same reason and one more: a timer
+  // that fires after the collection has gone would write diagnostics into a
+  // disposed object. Also idempotent.
+  disposeDialectLint();
 }
 
 // MARK: - Graphviz warm-up

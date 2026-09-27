@@ -15,11 +15,12 @@ code).
 
 > This is the VS Code port of [**md**](https://github.com/nettrash/md),
 > the iPhone / iPad editor, and of its native
-> [macOS](https://github.com/nettrash/md.macOS) and
-> [Android](https://github.com/nettrash/md.Android) siblings. All four
+> [macOS](https://github.com/nettrash/md.macOS),
+> [Windows](https://github.com/nettrash/md.win) and
+> [Android](https://github.com/nettrash/md.Android) siblings. All five
 > share the same hand-written block parser, renderer and themed HTML
 > export; this port reimplements them in TypeScript. The difference worth
-> knowing is that the other three own their whole preview window and this
+> knowing is that the other four own their whole preview window and this
 > one is a guest in VS Code's: so the byte-for-byte parity contract lives
 > in the **export** path, which md.vscode writes end to end, while the
 > preview aims at looking the same rather than at being the same bytes.
@@ -106,6 +107,23 @@ code).
   apps leave `.dot` unclaimed because macOS already declares it a Word
   template; a language association inside VS Code is not a system-wide
   file type, so here it costs nothing and is claimed.
+- **Every spelling of Markdown opens as Markdown.** The family's list is
+  `.md`, `.markdown`, `.mdown`, `.markdn`, `.mdtext`, `.mdtxt`, `.mkd`,
+  `.mkdn`, `.mdwn` and `.mkdown`, and VS Code's own `markdown` language
+  already knows all but `.mkdn` and `.mkdown` — so the extension
+  contributes exactly those two, as a second `languages` entry in
+  `package.json` that names the **built-in** id and carries nothing but
+  `extensions`. VS Code merges such an entry into the language it
+  already has rather than replacing it; that is the whole trick, and
+  also the rule: the entry must never grow `aliases`, a `configuration`
+  or a grammar of its own, because any of those would shadow the
+  built-in's and turn every `.md` file into ours. `package.json` cannot
+  carry a comment, so the reason lives here and in
+  `test/package.test.ts`, which pins all three extension lists. Newer
+  editors have lengthened their own list — 1.138 already carries
+  `.mkdn` — and a repeated extension is harmless there; the entry is for
+  the oldest editor `engines.vscode` admits, where it is what makes the
+  file open as Markdown at all.
 - **Where each engine runs.** Not an implementation detail — it is the
   reason the preview works at all. VS Code's Markdown preview runs under
   `script-src 'nonce-…'` and nothing else, which forbids WebAssembly, so
@@ -119,7 +137,24 @@ code).
   wrong (Mermaid produces a 30 998-pixel-wide drawing with no text in
   it). Both are pure JavaScript, so the nonce policy allows them, and
   neither is loaded at all unless the document in front of you contains a
-  block of that kind.
+  block of that kind, with the engine switched on.
+- **The diagrams the built-in preview cannot draw, and where to draw
+  them.** PlantUML lays some of its diagrams out itself and hands the rest
+  to Graphviz, and Graphviz is the WebAssembly the preview's policy
+  forbids. So in the **preview**, sequence diagrams, the modern activity
+  syntax (`start` / `if` / `stop`), mind maps, Gantt charts, WBS, JSON,
+  YAML, salt wireframes and timing diagrams all draw; class, state,
+  component, object, use-case, deployment and ER diagrams — and the
+  legacy `(*) -->` activity syntax — show their source instead, after a
+  pause. Everywhere else in this extension they draw normally: the
+  **diagram panel** (*md: Preview Diagram*) and every **export** render
+  in a webview of md's own that permits WebAssembly and loads Graphviz.
+  This is measured rather than believed — `test/plantuml-csp.test.ts`
+  runs each of those diagrams in a real browser under the preview's real
+  policy on every test run — and it is not a setting anyone can change:
+  the built-in preview's Content Security Policy is VS Code's, and a
+  `!pragma layout smetana` does not move PlantUML off Graphviz in this
+  build.
 - **Everything renders on your machine.** The engines are files on disk
   inside the extension — KaTeX 0.17.0 with mhchem, Mermaid 11.16.0,
   Graphviz 14.1.1 through Viz.js 3.24.0, PlantUML 1.2026.4beta4 and
@@ -147,14 +182,71 @@ code).
   rather than a picture of it. *Export Diagram as SVG…* saves one
   diagram as a real vector file; math is not on that list, because KaTeX
   sets a formula as HTML and text and there is no vector to hand over.
+- **The exports are where the files are.** Every one of them is on the
+  right-click menu now as well as in the Command Palette: **md: Export**
+  opens as a submenu with *HTML*, *PDF*, *EPUB* and *LaTeX* under it —
+  on a Markdown file in the Explorer, in the editor itself, and on the
+  editor tab — with *Export Diagram as SVG…* and *Preview Diagram*
+  beside it on a `.puml` or `.gv` file. A menu hands the command the
+  file that was clicked, so the export is of **that** file rather than
+  of whatever editor happened to be focused, and of the unsaved text
+  when the file is open, which is what you are looking at.
+- **A folder of Markdown, exported in one go.** Select several Markdown
+  files in the Explorer, right-click, and *HTML*, *EPUB* or *LaTeX*
+  exports all of them: one question — which folder — then one
+  cancellable progress notification counting through the files, and one
+  line at the end saying how many landed, naming any that did not and
+  any non-Markdown file that was skipped. Each export is named after its
+  own source file, so `notes.md` becomes `notes.html`, and a name
+  already taken in the destination — two `README.md` from two folders,
+  or a previous export sitting there — takes a `-2` instead of
+  overwriting it. **PDF is the one export a batch does not offer**,
+  because it writes no bytes itself: it hands a print-ready page to the
+  host's print dialogue, where you choose *Save as PDF* and a
+  destination, and twenty print dialogues in a row is not an export. It
+  stays one file at a time, from the same menu.
 - **Every engine has an off switch.** `md.math.enabled`,
   `md.diagrams.mermaid`, `md.diagrams.graphviz`, `md.diagrams.plantuml`
   and `md.highlight.enabled` each turn one of them off for a workspace or
   a folder, and a block whose engine is off stays readable as the source
-  you wrote — never blank, and never an error box. `md.diagrams.plot`
-  joins them and is the odd one out: there is no engine behind a chart,
-  so turning it off loads nothing less — it is there for when the numbers
-  behind a figure are what you want to read.
+  you wrote — never blank, and never an error box. Switching one off also
+  means its engine is never fetched: a document full of Mermaid with
+  `md.diagrams.mermaid` off costs the preview nothing at all, which for
+  PlantUML is 7.4 MB not loaded. `md.diagrams.plot` joins them and is the
+  odd one out: there is no engine behind a chart, so turning it off loads
+  nothing less — it is there for when the numbers behind a figure are
+  what you want to read.
+- **It tells you where md's Markdown differs from GitHub's.** md renders
+  a deliberate subset — that is the line at the top of this README, and
+  it is a decision three shipping apps made — so a document written for
+  GitHub can render differently here with nothing to say it has. The
+  extension now says it, as a faint underline and a row in the Problems
+  pane, at **Information** level and never higher: the Markdown is not
+  wrong, it will simply look different. Five rules, each naming what md
+  does instead:
+
+  | Rule | What md does instead |
+  | --- | --- |
+  | `rawHtml` | Escapes the tag. `<b>bold</b>` appears as those characters; there is no raw-HTML passthrough anywhere in the renderer. |
+  | `referenceLink` | Has neither half of the syntax. `[text][label]` prints as written, and the `[label]: url` line prints too instead of disappearing. |
+  | `indentedCode` | Has no indented code block. Four spaces start a **paragraph**, so the indentation and the monospaced type are lost. *Quick fix: wrap it in a fence.* |
+  | `tableAfterParagraph` | Needs a blank line above a table. Written straight under a paragraph, the rows stay part of it and render as text. *Quick fix: insert the blank line.* |
+  | `footnote` | Prints a definition nothing cites at the foot of the document anyway, with no number in the text and no link back to it, where a CommonMark engine swallows the line and prints nothing at all. |
+
+  Two of the five carry a quick fix, and only those two: fencing an
+  indented block and adding a blank line are rearrangements with no
+  judgement in them, whereas which URL a reference link meant is a
+  question only the author can answer. The lint decides through the same
+  parser and the same inline pass the preview renders with — never a
+  second parser, which is how a lint comes to report a difference that is
+  not there — so a `<` in prose is not a tag, a tag inside backticks is
+  not a tag, an indented paragraph under a list item is not code, a
+  footnote defined at the foot of the file is cited, and `[^a-z]` in a
+  sentence about regular expressions is a character class rather than a
+  citation of a note that is missing. Switch the whole
+  thing off with `md.lint.dialect`, or one rule at a time with
+  `md.lint.rules`. It reads the document in the editor and nothing else;
+  nothing is sent anywhere, as ever.
 
 ## Platform
 
@@ -163,19 +255,19 @@ code).
   extension host and read their files from disk, which the browser
   extension host cannot do — so there is no `vscode.dev` build rather
   than a `vscode.dev` build that silently renders half a document.
-- **No view-mode memory, on purpose.** The iPhone, iPad, Mac and Android
-  apps remember whether each file was last open in the editor, the
-  preview or a split, because those apps own their whole window and
-  something there has to decide. Here VS Code decides, and has since
-  before this extension existed: *Open Preview* (`markdown.showPreview`)
-  and *Open Preview to the Side* (`markdown.showPreviewToSide`) put the
-  preview where you want it, **View: Toggle Editor Group Layout**
-  rearranges the columns, and the editor restores the groups and tabs you
-  left open when the window comes back. So this port keeps no memory of
-  its own, adds no setting for one and auto-opens nothing — not a gap in
-  the port but the same decision the preview itself rests on: a document
-  should render the same however you opened it, and where you opened it
-  is yours.
+- **No view-mode memory, on purpose.** The iPhone, iPad, Mac, Windows
+  and Android apps remember whether each file was last open in the
+  editor, the preview or a split, because those apps own their whole
+  window and something there has to decide. Here VS Code decides, and
+  has since before this extension existed: *Open Preview*
+  (`markdown.showPreview`) and *Open Preview to the Side*
+  (`markdown.showPreviewToSide`) put the preview where you want it,
+  **View: Toggle Editor Group Layout** rearranges the columns, and the
+  editor restores the groups and tabs you left open when the window
+  comes back. So this port keeps no memory of its own, adds no setting
+  for one and auto-opens nothing — not a gap in the port but the same
+  decision the preview itself rests on: a document should render the
+  same however you opened it, and where you opened it is yours.
 - **PDF is the one export without byte parity**, and deliberately so: the
   apps paginate through WebKit and this port cannot, and American
   Typewriter does not exist away from Apple, so the glyphs themselves
@@ -211,7 +303,20 @@ Requires Node 20, the major VS Code runs extensions on. Press F5 in this
 repository to launch an Extension Development Host with the extension
 loaded. There is no build number to increment as there is on iOS, macOS
 and Android; the Marketplace takes a three-part version, so the family's
-`1.1` is published as `1.1.0`.
+`1.5` is published as `1.5.0`.
+
+Publishing goes to **two** registries from one built file —
+`npm run publish:vsix`, which is `vsce publish --packagePath` and
+`ovsx publish --packagePath` over the `.vsix` the packaging step
+produced, never the bare verbs. The second registry is
+[Open VSX](https://open-vsx.org), which is what Cursor, Windsurf,
+VSCodium, Gitpod and Theia install from. The `nettrash` namespace there
+was claimed on 2026-09-23 and is still empty; what is left is the two
+repository secrets and a tagged release. `marketplace/README.md` has the
+detail. The `publish` job in CI runs
+only on a `v*.*.*` tag and only once **both** `VSCE_PAT` and `OVSX_PAT`
+exist, so until then a tag builds, tests and packages and publishes
+nothing.
 
 ## License
 

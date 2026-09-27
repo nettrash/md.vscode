@@ -186,18 +186,23 @@ export function renderDocument(source: string, opts: RenderOptions): string {
   //
   // The `needs.plantuml` half of this condition is inherited from md, whose
   // comment explains it as "PlantUML needs Viz for its own Graphviz-backed
-  // layouts (class, activity, …)". **That explanation does not survive
-  // testing.** Loading plantuml.js in Node with no `Viz` global in scope at
-  // all still renders sequence, class and activity diagrams correctly — this
-  // TeaVM build carries PlantUML's own pure-Java *Smetana* layout engine
-  // (14 references to it in the bundle) and never reaches for Viz.
+  // layouts (class, activity, …)". A comment here used to say that explanation
+  // "does not survive testing", on the strength of the `smetana.core` classes
+  // being present in the bundle. **It is the correction that did not survive
+  // testing.** Measured in real Chromium in `test/plantuml-csp.test.ts`: a
+  // class, state, component, object, use-case, deployment or ER diagram — and
+  // the legacy `(*) -->` activity syntax — reads the global `Viz` exactly once
+  // and fails outright without it. The Smetana classes are in the bundle with
+  // nothing that reaches them, and `!pragma layout smetana` does not change the
+  // path taken. So this include is not inherited baggage: it is what makes
+  // those diagrams work in a standalone HTML export, where WebAssembly is
+  // ordinary. (It is also what the three shipping apps emit, and this
+  // function's no-hook output is byte-compared against `MarkdownHTML.document`,
+  // so it could not be dropped in one port alone in any case.)
   //
-  // The include is kept anyway, deliberately, on two grounds: it is what the
-  // three shipping apps emit, and this function's no-hook output is
-  // byte-compared against `MarkdownHTML.document`, so dropping it would fail
-  // the parity gate for a saving that only shows up in a standalone HTML
-  // export that also contains PlantUML. Revisit it in all four ports together
-  // or not at all.
+  // The built-in preview is the one surface that cannot have it — nonce-only
+  // `script-src`, so no WebAssembly — which is why those kinds show their
+  // source there and why `preview/md-preview.ts` says so at length.
   //
   // PlantUML itself is never included here: the preview `import()`s it lazily
   // when a `.plantuml` element exists.

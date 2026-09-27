@@ -501,9 +501,12 @@ function diagramDocument(source: string, title: string, dark: boolean): string {
  * which registers its macros onto the global KaTeX defines and silently no-ops
  * against a mismatched build; both are classic `defer` scripts, so they run in
  * document order and ahead of md-init.js, which is a module at the end of the
- * body. Viz.js is Graphviz and is included for PlantUML too — inherited from md
- * and kept for parity with the three apps, though this TeaVM build carries
- * PlantUML's own Smetana layout and never reaches for it.
+ * body. Viz.js is Graphviz and is included for PlantUML too, and that is
+ * load-bearing rather than inherited: the kinds PlantUML lays out through
+ * Graphviz read the global `Viz` and fail without it, as
+ * `test/plantuml-csp.test.ts` measures. This panel's webview grants
+ * `'wasm-unsafe-eval'` (see the header), so here they draw — which is what
+ * makes it the answer for a class diagram the built-in preview cannot show.
  *
  * In practice a `.puml` or `.gv` file reaches only the Viz line: `renderBody`
  * hard-codes `needs` for a raw diagram document, and there is no Markdown in it

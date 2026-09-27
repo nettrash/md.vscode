@@ -74,13 +74,21 @@ export const PREVIEW_STYLES: readonly string[] = [
  * real `canvas.getContext('2d').measureText`, and a shim only approximates the
  * box sizes.
  *
- * `viz-global.js` is deliberately absent. Graphviz is WebAssembly, and the
- * built-in preview's `script-src` is `'nonce-…'` and nothing else — no
- * `'wasm-unsafe-eval'` — so `WebAssembly.instantiate` throws a `CompileError`
- * there. Graphviz therefore runs in the extension host and arrives as finished
- * SVG. (An older reading of the sources held that PlantUML needs the global
- * `Viz` for its class and activity layouts; measurement of the shipped bundle
- * shows it uses its own Smetana layout instead, so it stands alone here.)
+ * `viz-global.js` is deliberately absent, and its absence is not free.
+ * Graphviz is WebAssembly, and the built-in preview's `script-src` is
+ * `'nonce-…'` and nothing else — no `'wasm-unsafe-eval'` — so
+ * `WebAssembly.instantiate` throws a `CompileError` there. Graphviz therefore
+ * runs in the extension host and arrives as finished SVG, and shipping the
+ * file here would buy nothing but 1.4 MB.
+ *
+ * The cost is PlantUML's: the diagram kinds it lays out through Graphviz
+ * (class, state, component, object, use-case, deployment, ER, and the legacy
+ * `(*) -->` activity syntax) read a global `Viz` that consequently does not
+ * exist, and show their source instead. This file used to claim the opposite —
+ * that the TeaVM build lays them out with its own Smetana engine and stands
+ * alone. It does not; `test/plantuml-csp.test.ts` measures every one of them in
+ * a real browser under this very policy, along with the pragma that looks like
+ * it should fix it and does not.
  */
 export const RICH_ENGINE_FILES = {
   mermaid: 'mermaid.min.js',

@@ -8,6 +8,13 @@ on:
     # 1.0-era commit ever since. Listing both means this badge reports the
     # branch the work is actually on, whichever name the remote settles on.
     branches: [ "master", "main" ]
+    # A release is a tag. `branches` and `tags` are OR-ed by GitHub, so a
+    # push of `v1.3.0` runs Build and Test exactly as a branch push does and
+    # then — and only then — the publish job below. The two-part `v1.0` style
+    # of the early tags is deliberately not matched: the Marketplace requires
+    # a three-part version and a tag that cannot be one should not start a
+    # release.
+    tags: [ "v*.*.*" ]
   pull_request:
     branches: [ "master", "main" ]
 
@@ -103,3 +110,112 @@ jobs:
           name: vsix
           path: '*.vsix'
           retention-days: 7
+
+  # --------------------------------------------------------------------------
+  # Publish — inert until nettrash adds the two secrets.
+  # --------------------------------------------------------------------------
+  #
+  # WHY THIS JOB DOES NOTHING TODAY, ON PURPOSE
+  # -------------------------------------------
+  # There is no Marketplace PAT and no Open VSX token in this repository, and
+  # no Eclipse account behind the second one yet (marketplace/README.md lists
+  # the five one-time steps). A publish job that failed loudly for want of a
+  # secret would turn every tag red; one that publishes only when both tokens
+  # exist is simply not there until the day they do. So the secrets are read
+  # into a step's own environment, that step writes a flag, and every step
+  # after it is guarded by the flag.
+  #
+  # The secrets have to be read that way round because `secrets` is not one of
+  # the contexts GitHub makes available to a job-level `if:` — only `github`,
+  # `needs`, `vars` and `inputs` are. A job-level `if: secrets.VSCE_PAT != ''`
+  # looks right, evaluates to nothing, and runs the job unconditionally.
+  #
+  # And the gates run first: `needs: build-test` means a tag whose type-check,
+  # tests, compile or packaging fails publishes nothing at all.
+  #
+  publish:
+    name: Publish
+    needs: build-test
+    # A tag, and nothing else. `github.ref` for a tag push is
+    # `refs/tags/v1.3.0`; for a branch push it is `refs/heads/master`.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # The same major as the job above. `ovsx` is pinned to the 0.10 line
+          # for this reason: its 1.x releases require Node 22 or newer, and
+          # the runtime here follows the extension host rather than the tool.
+          node-version: '20'
+
+      - name: Do we have the tokens?
+        id: tokens
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -n "$VSCE_PAT" ] && [ -n "$OVSX_PAT" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Nothing published::VSCE_PAT and OVSX_PAT are not both set, so this tag was not published to either registry. See marketplace/README.md."
+          fi
+
+      - name: Does the tag match package.json?
+        if: steps.tokens.outputs.ready == 'true'
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $VERSION. Nothing published."
+            exit 1
+          fi
+          echo "Publishing version $VERSION."
+
+      - name: Install
+        if: steps.tokens.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Gates
+        if: steps.tokens.outputs.ready == 'true'
+        # Repeated here rather than trusted to the job above, because this job
+        # checks the tree out again and publishes what IT built: the artefact
+        # that goes to two registries must be the one these three gates passed.
+        run: |
+          npm run typecheck
+          npm run test
+          npm run compile
+
+      - name: Package
+        if: steps.tokens.outputs.ready == 'true'
+        # Through the script, never `vsce package`: the Marketplace details
+        # page is the packaged README.md, and this is what stands
+        # marketplace/extension-README.md in at that filename. Open VSX reads
+        # the same file out of the same .vsix.
+        run: node scripts/package.mjs --list
+
+      - name: Publish to the Marketplace and to Open VSX
+        if: steps.tokens.outputs.ready == 'true'
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        # One script for both, so the two registries cannot come to hold two
+        # different builds of one version. It publishes the .vsix by path and
+        # never lets either tool package anything itself.
+        run: npm run publish:vsix
+
+      - name: Upload the published extension
+        if: steps.tokens.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix-release
+          path: '*.vsix'
+          # Longer than the branch build's seven days: this is the artefact
+          # that was actually published, and the first question after a bad
+          # release is "what exactly went out?".
+          retention-days: 90

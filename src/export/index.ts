@@ -33,10 +33,10 @@ import * as vscode from 'vscode';
 
 import { frontMatter, outline } from '../render/parser';
 import { renderDocument } from '../render/html';
-import { trimWSNL } from '../render/text';
 import { readConfig } from '../preview/config';
 import { openDiagramPreview } from '../preview/diagramPreview';
 
+import { sanitized, stemOfPath } from './batch';
 import {
   applyImageReplacements,
   bodyContent,
@@ -70,7 +70,22 @@ export async function exportLatex(document: vscode.TextDocument): Promise<void> 
   const title = baseName(document);
   const destination = await askWhereToSave(document, title, 'tex', { LaTeX: ['tex'] });
   if (destination === null) return;
-  await write(destination, Buffer.from(latexDocument(document.getText()), 'utf8'));
+  await write(destination, latexBytes(document));
+}
+
+/**
+ * The same `.tex`, as bytes and without a dialogue.
+ *
+ * The three `…Bytes` functions in this file are what a **batch** export runs:
+ * one destination has already been chosen for the whole selection, so the
+ * step that asks is the one step that must not happen per file. They are the
+ * middle of each command above with both ends removed — no dialogue, no
+ * write, no notification — which is why each command is now written in terms
+ * of its own byte function rather than beside it. `quiet` suppresses the
+ * per-file progress notification, because the batch shows one of its own.
+ */
+export function latexBytes(document: vscode.TextDocument): Uint8Array {
+  return Buffer.from(latexDocument(document.getText()), 'utf8');
 }
 
 // MARK: - SVG  (ship order 2 — pure fix-up plus one DOM read)
@@ -129,12 +144,23 @@ export async function exportHtml(document: vscode.TextDocument): Promise<void> {
   const title = baseName(document);
   const destination = await askWhereToSave(document, title, 'html', { HTML: ['html'] });
   if (destination === null) return;
+  await write(destination, await htmlBytes(document));
+}
 
+/** The self-contained `.html`, as bytes and without a dialogue. See `latexBytes`. */
+export async function htmlBytes(
+  document: vscode.TextDocument,
+  quiet = false,
+): Promise<Uint8Array> {
+  const title = baseName(document);
   const input = exportDocumentHTML(document.getText(), title);
-  const captured = await withRenderHost(input, title, 'Rendering for export…', (host) =>
-    host.selfContainedHTML(),
+  const captured = await withRenderHost(
+    input,
+    title,
+    quiet ? null : 'Rendering for export…',
+    (host) => host.selfContainedHTML(),
   );
-  await write(destination, Buffer.from(finishSelfContainedHTML(captured, input), 'utf8'));
+  return Buffer.from(finishSelfContainedHTML(captured, input), 'utf8');
 }
 
 // MARK: - EPUB  (ship order 4 — exact container, rasterised rich blocks)
@@ -157,15 +183,27 @@ export async function exportEpub(document: vscode.TextDocument): Promise<void> {
 
   const destination = await askWhereToSave(document, title, 'epub', { EPUB: ['epub'] });
   if (destination === null) return;
+  await write(destination, await epubBytes(document));
+}
 
+/** The `.epub`, as bytes and without a dialogue. See `latexBytes`. */
+export async function epubBytes(
+  document: vscode.TextDocument,
+  quiet = false,
+): Promise<Uint8Array> {
+  const source = document.getText();
+  const title = documentTitle(frontMatter(source), baseName(document));
   const html = renderDocument(source, { title, dark: false, export: true });
   let body = bodyContent(html);
   const ranges = richElementRanges(body);
   const images: EpubImage[] = [];
 
   if (ranges.length > 0) {
-    const snapshots = await withRenderHost(html, title, 'Rendering diagrams for the EPUB…', (host) =>
-      host.snapshots(2),
+    const snapshots = await withRenderHost(
+      html,
+      title,
+      quiet ? null : 'Rendering diagrams for the EPUB…',
+      (host) => host.snapshots(2),
     );
     // The string scan and the DOM query find the same containers in the same
     // order, so they pair up index-for-index. A count mismatch or a failed
@@ -181,14 +219,13 @@ export async function exportEpub(document: vscode.TextDocument): Promise<void> {
     body = applyImageReplacements(body, ranges, replacements);
   }
 
-  const bytes = packDocumentEpub({
+  return packDocumentEpub({
     title,
     body: xhtml(body),
     images,
     outline: outline(source),
     modified: modifiedNow(),
   });
-  await write(destination, bytes);
 }
 
 // MARK: - PDF  (ship order 5 — documented non-parity)
@@ -265,12 +302,10 @@ export async function showDiagramPreview(document: vscode.TextDocument): Promise
 async function withRenderHost<T>(
   html: string,
   title: string,
-  progress: string,
+  progress: string | null,
   capture: (host: RenderHost) => Promise<T>,
 ): Promise<T> {
-  return vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `md: ${progress}` },
-    async () => {
+  const run = async (): Promise<T> => {
       const host = await RenderHost.open(html, { title: `md — ${title}` });
       try {
         const captured = await capture(host);
@@ -289,7 +324,14 @@ async function withRenderHost<T>(
       } finally {
         host.dispose();
       }
-    },
+  };
+
+  // `null` is a batch: one progress notification is already up for the whole
+  // selection, and a second one per file would stack twenty deep.
+  if (progress === null) return run();
+  return vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: `md: ${progress}` },
+    run,
   );
 }
 
@@ -354,22 +396,9 @@ async function write(destination: vscode.Uri, bytes: Uint8Array): Promise<void> 
 
 /** The document's file name without its extension — the title every export uses. */
 function baseName(document: vscode.TextDocument): string {
-  const name = path.basename(document.uri.path);
-  const extension = path.extname(name);
-  const stem = extension.length > 0 ? name.slice(0, -extension.length) : name;
-  return stem.length > 0 ? stem : 'Document';
+  return stemOfPath(document.uri.path);
 }
 
-/**
- * A file name from a title, with the characters no file system will take.
- *
- * The set is the apps' own — `/ \ : ? % * | " < >` — and so is the shape of the
- * replacement: it is a split-join, so a run of two offending characters becomes
- * **two** dashes, not one. Empty after trimming falls back to `Document`, the
- * same word the apps use.
- */
-export function sanitized(name: string): string {
-  const joined = name.split(/[/\\:?%*|"<>]/).join('-');
-  const trimmed = trimWSNL(joined);
-  return trimmed.length > 0 ? trimmed : 'Document';
-}
+// `sanitized` lives in `./batch` with the rest of the naming rules and is
+// re-exported here, where every caller already looks for it.
+export { sanitized };

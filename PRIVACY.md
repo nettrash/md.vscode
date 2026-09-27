@@ -45,19 +45,30 @@ you name when you ask for an export. It is disabled in a folder you have
 not trusted, because it declares no support for untrusted workspaces and
 that restricted default is the right one to leave alone.
 
+It also reads the Markdown document you are **editing**, to point out
+where md's deliberate subset of Markdown renders differently from
+GitHub's (`md.lint.dialect`). That reading happens in the extension
+host on your own machine, in memory, half a second after you stop typing;
+the result is a list of positions handed to VS Code's Problems pane and
+nothing else. Nothing is stored, nothing is cached between sessions, and
+nothing is sent anywhere — there is no service behind it, and no network
+call is made for it at all. Switching the setting off stops the reading;
+leaving it on sends nothing either way.
+
 The extension's own settings are ordinary VS Code settings, written by
 the editor into your user or workspace `settings.json` and readable by
 you at any time. They are, in full: which palette the preview draws in
 (`md.preview.theme`), the two font stacks (`md.preview.bodyFont`,
 `md.preview.codeFont`), whether each engine is enabled
 (`md.math.enabled`, `md.diagrams.mermaid`, `md.diagrams.graphviz`,
-`md.diagrams.plantuml`, `md.highlight.enabled`) and the page size used
-for PDF export (`md.export.pageSize`). Beyond those the extension stores
-nothing at all: no database, no cache, no recent-documents list, and
-nothing in VS Code's global or workspace state. None of it leaves your
-machine, and none of it contains personal information. If a future
-version remembers anything else, it is added to this list in the same
-commit that adds the setting.
+`md.diagrams.plantuml`, `md.diagrams.plot`, `md.highlight.enabled`), the
+page size used for PDF export (`md.export.pageSize`) and whether the
+Markdown-dialect lint runs and which of its rules (`md.lint.dialect`,
+`md.lint.rules`). Beyond those the extension stores nothing at all: no
+database, no cache, no recent-documents list, and nothing in VS Code's
+global or workspace state. None of it leaves your machine, and none of it
+contains personal information. If a future version remembers anything
+else, it is added to this list in the same commit that adds the setting.
 
 ## Permissions
 

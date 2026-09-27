@@ -79,6 +79,7 @@ import { renderGraphvizSync } from '../engines/graphviz';
 import { renderBody, type EngineHooks } from '../render/html';
 import { escapeHTML } from '../render/inline';
 import { isDarkTheme, readConfig, wrapperAttributes, type MdConfig } from './config';
+import { formatEngineList, RENDER_ATTRIBUTE, type ClientEngine } from './engines';
 
 /**
  * Source text by token array.
@@ -224,7 +225,7 @@ function previewBody(source: string, env: any): string {
   const clientEngines = clientEngineList(config, needs);
 
   return (
-    `<div ${wrapperAttributes(config, dark)} data-md-render="${clientEngines}">\n` +
+    `<div ${wrapperAttributes(config, dark)} ${RENDER_ATTRIBUTE}="${clientEngines}">\n` +
     `${html}\n` +
     `</div>`
   );
@@ -252,21 +253,23 @@ function engineHooks(config: MdConfig): EngineHooks | undefined {
 }
 
 /**
- * Which client-side engines this document should load, as a space-separated
- * list for `data-md-render`.
+ * Which client-side engines this document should load, as the space-separated
+ * value of `data-md-render`.
  *
  * Two questions, one answer: does the document contain such a block (`needs`,
  * which the emitter derives from the markup it actually produced, so a diagram
  * nested inside a block quote counts), and has the user left that engine on.
  * The client cannot see the settings, so a DOM scan alone would render a
- * Mermaid diagram the user had switched off. An empty value is meaningful and
- * is emitted: it says "no engine, do not fetch 3.5 MB".
+ * Mermaid diagram the user had switched off — which is precisely what it did
+ * until `md-preview.ts` learned to read this back through `preview/engines.ts`.
+ * An empty value is meaningful and is emitted: it says "no engine, do not fetch
+ * 3.5 MB".
  */
 function clientEngineList(config: MdConfig, needs: { mermaid: boolean; plantuml: boolean }): string {
-  const wanted: string[] = [];
+  const wanted: ClientEngine[] = [];
   if (needs.mermaid && config.mermaid) wanted.push('mermaid');
   if (needs.plantuml && config.plantuml) wanted.push('plantuml');
-  return wanted.join(' ');
+  return formatEngineList(wanted);
 }
 
 /**

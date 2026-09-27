@@ -6,15 +6,243 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 There is no build number to auto-increment here — no `agvtool bump` as on
 iOS and macOS, no Gradle `versionCode` finalizer as on Android — and the
-Marketplace requires a three-part version, so the family's two-part `1.1`
-is published as `1.1.0`. A republish that changes no behaviour is not
-tracked here.
+Marketplace requires a three-part version, so the family's two-part `1.5`
+is published as `1.5.0`. A republish that changes no behaviour is not
+tracked here, which is why `1.2.1` — a relisting that corrected the
+Marketplace description and replaced the screenshots — has no section of
+its own.
 
-This is a new app rather than a continuation of the apps' 1.3 line. Every
-md port has begun at its own 1.0 and joined the family's number at the
-next family release, and this one does the same — arriving, because it
-comes last, with everything the other three learned through 1.3 already
-in it.
+This extension began at its own 1.0 rather than as a continuation of the
+apps' 1.3 line, and this file has said since that release that it would
+join the family's number at the next family one. It has. The section
+below is **1.5**, the number the iPhone, iPad, Mac, Windows and Android
+apps all carry from this date, and it follows 1.2 directly: nothing is
+missing between the two, because the number is the family's rather than
+this extension's own count, and this extension has simply stepped into
+it.
+
+## [1.5] — 2026-09-23
+
+### Added
+
+- **The exports are on the right-click menu, and a selection of files
+  exports as one job.** Until now every export lived in the Command
+  Palette alone, which is the one place where "the document" is never in
+  doubt. There is now an **md: Export** submenu — HTML, PDF, EPUB, LaTeX
+  — on a Markdown file in the Explorer, in the editor and on the editor
+  tab, with *Export Diagram as SVG…* and *Preview Diagram* beside it on
+  a `.puml` or `.gv` file. Contributing them meant fixing the
+  registration first: every command was registered as
+  `registerCommand(id, () => runOnDocument(id, run))`, an arrow taking
+  no arguments where VS Code passes two — the resource that was clicked
+  and, in the Explorer, the whole selection. Dropping them was harmless
+  while the palette was the only way in and would have been a silent
+  wrong answer the moment a menu row existed: right-click `notes.md`,
+  choose *Export as EPUB*, and get an EPUB of whichever document
+  happened to be focused, under that other document's name, with no
+  error anywhere. The arguments are read now, and the rule that reads
+  them is a function with tests rather than a shape agreement between a
+  callback and its caller. A resolved file is opened with
+  `workspace.openTextDocument` and never shown, which also settles what
+  an author would ask next: exporting a file that is open exports the
+  **unsaved** text, because that is what is on the screen. Selecting
+  several Markdown files and choosing HTML, EPUB or LaTeX now exports
+  all of them: one question — which folder — then one cancellable
+  progress notification counting through the files, and one summary
+  naming what failed and what was skipped for not being Markdown (a
+  `when` clause speaks only for the file that was clicked, so a mixed
+  selection arrives with folders and images in it). **What counts as
+  Markdown there is the editor's answer, not a list kept here**: the
+  menu row is contributed under `resourceLangId == markdown`, and the
+  editor's own language claims more spellings than the family's ten and
+  lengthens its list with every release — `.ronn` and `.workbook` among
+  them, and the Cursor rule files by name rather than by extension at
+  all. Filtering a selection by extension threw those out with a message
+  the editor disagrees with, while the same files exported perfectly one
+  at a time; the family's ten are now a cheap yes, asked first so that a
+  folder of `.md` need not be opened file by file, and anything they
+  cannot settle is opened and asked its `languageId`. A uri that will
+  not open at all — a folder, most often — is a skip rather than a
+  failure. Each file is named after its own source, `notes.md` to
+  `notes.html`, and a name already taken in the destination takes a `-2`
+  instead of overwriting — two `README.md` from two folders land side by
+  side, compared case-insensitively because the file systems this runs
+  on are. **PDF is the one export with no batch**: it writes no bytes of
+  its own, it hands a print-ready page to the host's print dialogue one
+  document at a time, so it is hidden for a multi-selection
+  (`!listMultiSelection`) and said so in the README rather than failing
+  halfway through a folder.
+- **A quiet note where md's Markdown is not GitHub's.** The README has
+  said it since 1.0 — "a deliberate subset, not a CommonMark engine" —
+  and a reader only ever found out which parts by looking at the preview
+  and wondering. There is now an **Information**-level diagnostic, and
+  it is Information in the one place a `Diagnostic` is built, with no
+  setting to raise it: these constructs are perfectly good Markdown,
+  they will simply look different here, and a warning squiggle under
+  valid prose is how a lint gets switched off within the hour. Five
+  rules, each saying what md does instead: **raw HTML** (escaped, so a
+  tag shows as the characters you typed), **reference links** (neither
+  half exists — the `[text][label]` and the `[label]: url` line both
+  print as written), **four-space indented code** (a paragraph here, so
+  the indentation and the monospaced type are lost), **a table written
+  straight under a paragraph** (md's paragraph loop carries no table
+  lookahead, so the rows are swallowed into it) and **a footnote nothing
+  cites** (md prints the note at the foot of the document anyway, with
+  no number in the text and no link back to it, where a CommonMark
+  engine swallows the line as a link reference definition and prints
+  nothing at all). Two carry a quick fix and only two, because fencing a
+  block and inserting a blank line are rearrangements with no judgement
+  in them while *which URL a reference link meant* is a question only
+  the author can answer. The whole thing rests on one rule: **no second
+  parser.** Block structure comes from `parseWithLines()`, "would this
+  really be a table?" is answered by handing the lines back to
+  `parse()`, and "did the author write this inside backticks?" is
+  answered by running `inline()` over the text with the candidate
+  replaced by a private-use sentinel and looking at whether it came out
+  inside a `<code>` or a maths span — the same passes that render the
+  preview, so the lint cannot come to disagree with what is on screen.
+  That is what keeps `1 < 2` out of it, and `` `<b>` ``, and
+  `arr[0][1]`, and an indented paragraph under a list item, and a
+  footnote defined at the foot of the file; a document the parser drops
+  wholesale — a comment on its own line — is not linted at all. A
+  reference *use* is reported only when the document actually defines
+  that label, because without the definition GitHub prints it as written
+  too and there is no difference to report. A footnote *reference* is
+  not reported at all, for exactly that reason: `[^id]` with nothing
+  behind it is literal text in md, in markdown-it and on GitHub alike,
+  so there is nothing to tell anyone — and the candidate is shaped like
+  a negated character class, so one sentence of prose about `[^a-z]`
+  would have carried a permanent underline and an offer to define a
+  footnote called `a-z`. Sixty tests in `test/dialect.test.ts` hold it
+  there, including the whole of the shipped example set asserted to be
+  clean — except *09-Writer Tools*, which demonstrates an uncited note
+  in so many words, and where the lint finds exactly that one and
+  nothing else: nothing for the citation with no note beside it, and
+  nothing for the `[^id]` written inside backticks four lines above.
+  `md.lint.dialect` turns it off; `md.lint.rules` turns off one rule at
+  a time.
+- **Every spelling of a Markdown file opens as one.** The family's list
+  of Markdown extensions is `.md`, `.markdown`, `.mdown`, `.markdn`,
+  `.mdtext`, `.mdtxt`, `.mkd`, `.mkdn`, `.mdwn` and `.mkdown`, and VS
+  Code's own `markdown` language already knows all but the last two — so
+  in the oldest editor this extension admits, 1.95, a `.mkdn` or
+  `.mkdown` file opened as plain text, with no preview, no *md* commands
+  and no highlighting. Both are now contributed to the **built-in**
+  language id rather than to a language of ours: a second `languages`
+  entry that names `markdown` and carries nothing but the two
+  extensions, which VS Code merges into the language it already has.
+  Nothing else is touched, on purpose — no alias, no language
+  configuration, no grammar — because any of those would shadow the
+  built-in's, and a `.md` file would stop being VS Code's Markdown to
+  become ours. Newer editors have lengthened their own list (1.138
+  carries `.mkdn`), and a repeated extension is harmless there. A test
+  now pins the three languages' extension lists and the activation
+  events beside them, so this decision and the `.dot` one recorded in
+  the README — claimed here, left alone by the apps — cannot drift from
+  their reasons.
+- **Ready for Open VSX, and inert until there is a token.** The
+  Marketplace is Microsoft's and its terms allow only Microsoft's
+  products to install from it, so Cursor, Windsurf, VSCodium, Gitpod and
+  Theia read [open-vsx.org](https://open-vsx.org) instead, where
+  `nettrash` holds nothing. **This release publishes nothing there and
+  changes nothing for anyone installing from the Marketplace**: what
+  landed is the plumbing, ready for the day a token exists. `ovsx` joins
+  the toolchain, pinned to the **0.10** line because its 1.x releases
+  want Node 22 and this repository pins Node 20, the major the oldest
+  supported extension host runs; it adds 27 packages and no new audit
+  finding. `npm run publish:vsix` sends **one built `.vsix`, by path**,
+  to both registries — `vsce publish --packagePath` and
+  `ovsx publish --packagePath`, never the bare verbs, for the same
+  reason `vscode:prepublish` refuses a direct `vsce package`: either
+  tool, handed no file, packages the working tree and ships the
+  developer README as the listing page. One script for both, so two
+  registries cannot come to hold two different builds of one version
+  number — and **every check is made before the first upload**, which is
+  the other half of that promise. `ovsx verify-pat` answers whether the
+  namespace has been claimed and whether the token may publish into it,
+  both one-time steps nobody remembers skipping; asked between the two
+  uploads, as it was, a first tagged release would have put the build on
+  the Marketplace, failed with "Unknown namespace: nettrash", left Open
+  VSX empty, and burned a version number `vsce` will never accept again.
+  It is the last thing that happens before either upload now, and a dry
+  run makes it too. CI gains a `publish` job that runs only on a
+  `v*.*.*` tag, only after the tests, only if the tag matches
+  `package.json`, and only if **both** `VSCE_PAT` and `OVSX_PAT` exist —
+  read into a step's environment and turned into a flag, because
+  `secrets` is not a context GitHub offers a job-level `if:` and the
+  obvious spelling silently runs the job every time. Until the secrets
+  are there it prints one notice and stops. The one-time steps only
+  nettrash can take — an Eclipse account, the publisher agreement, a
+  token, the namespace itself, the two repository secrets — are written
+  out in `marketplace/README.md`, with the warning that Open VSX renders
+  the README and CHANGELOG out of the `.vsix` just as the Marketplace
+  does, so the first listing has to be read on the live page.
+
+### Fixed
+
+- **The two diagram off switches now switch something off.**
+  `md.diagrams.mermaid` and `md.diagrams.plantuml` are read in the
+  extension host; the engines they name run in the built-in preview's
+  page, which belongs to another extension and which the host can reach
+  only through the HTML it returns. The wanted engines were written into
+  that HTML from the first version — `data-md-render="mermaid plantuml"`
+  on the wrapper — and nothing ever read them back, so the client
+  rendered every diagram it could find and both settings did precisely
+  nothing in the preview while the README promised they did. The client
+  reads the attribute now, through one small pure module both ends share
+  (`src/preview/engines.ts`), so a rename cannot leave the writer and the
+  reader looking at different spellings. The check happens before the
+  engine is fetched rather than after: a document full of PlantUML with
+  the setting off now costs the preview nothing, where it used to cost
+  7.4 MB. The four host-side switches — `md.math.enabled`,
+  `md.diagrams.graphviz`, `md.diagrams.plot` and `md.highlight.enabled` —
+  were honoured all along, and are now pinned by tests in both directions
+  so that none of them can quietly join the other two.
+- **Which PlantUML diagrams the built-in preview can draw, settled by
+  measurement rather than by comment.** Three files in this repository
+  told two stories: one said PlantUML's Graphviz-backed layouts call a
+  global `Viz` that cannot exist under the preview's security policy, two
+  said the engine carries its own Smetana layout and never reaches for
+  Viz. Both were plausible from the bytes, and the second was wrong. Run
+  in a real browser under the preview's real policy — which is what
+  `test/plantuml-csp.test.ts` now does on every test run — sequence
+  diagrams, the modern `start` / `if` / `stop` activity syntax, mind
+  maps, Gantt charts, WBS, JSON, YAML, salt and timing all draw in about
+  a fifth of a second and never touch `Viz`; class, state, component,
+  object, use-case, deployment and ER diagrams, and the legacy `(*) -->`
+  activity syntax, read `Viz` exactly once and stop there, so the block
+  shows its source after the twenty-second wait. **That is a limit, not
+  a bug on its way out**: the built-in preview's Content Security Policy
+  is VS Code's own, it forbids the WebAssembly Graphviz is, and nothing
+  in this extension can lift it — `!pragma layout smetana` does not
+  change it either, and neither do its three other spellings, the
+  Smetana classes being in the engine with nothing that reaches them, so
+  no pragma is prepended to anything and exported bytes are untouched.
+  Those diagrams are not lost, only misplaced: the diagram panel
+  (*md: Preview Diagram*) and every export render in a webview of md's
+  own, which allows WebAssembly and draws all of them. The README and
+  the Marketplace page now say so, diagram kind by diagram kind, instead
+  of promising the preview can draw everything.
+
+### Not in this release, and not planned
+
+- **The editor features the apps gain in this same family release belong
+  to VS Code here, and are better in its hands.** *Find and replace* is
+  the editor's own and has been since long before this extension:
+  regular expressions, whole-word matching, multi-file search and a
+  preview of every hit, which is rather more than a find bar of ours
+  would ever have offered. **Hardware-keyboard chords** are the same
+  story from the other end: every command this extension contributes is
+  already in *Keyboard Shortcuts*, bindable to whatever the reader
+  prefers, and a chord hard-coded here would be a chord taken away from
+  them. **Smart typing** — Return continuing a list or a table row, the
+  first letter of a sentence capitalized — would mean intercepting
+  keystrokes in an editor this extension does not own and does not want
+  to own; it is a Markdown editor's job, and in VS Code the Markdown
+  editor is VS Code. And the **webview recovery** the apps needed has no
+  counterpart here, because the preview is not ours: the built-in
+  Markdown preview is VS Code's webview, and its lifecycle, its crashes
+  and its reloads are the editor's to handle.
 
 ## [1.2] — 2026-08-29
 

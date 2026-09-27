@@ -1,8 +1,8 @@
 {
   "name": "md-vscode",
   "displayName": "md",
-  "description": "Markdown preview with math, chemistry, charts and diagrams — KaTeX, Mermaid, Graphviz, PlantUML and a built-in plotter, all rendered on-device with nothing sent anywhere.",
-  "version": "1.2.1",
+  "description": "Markdown preview with math, chemistry, charts and diagrams: KaTeX, Mermaid, Graphviz, PlantUML and a built-in plotter, all on-device with nothing sent anywhere. Exports to HTML, PDF, EPUB, LaTeX and SVG.",
+  "version": "1.5.0",
   "publisher": "nettrash",
   "license": "MIT",
   "author": {
@@ -29,8 +29,15 @@
   ],
   "keywords": [
     "markdown",
+    "preview",
+    "math",
     "chart",
     "plot",
+    "diagram",
+    "export",
+    "pdf",
+    "epub",
+    "latex",
     "katex",
     "mermaid",
     "plantuml",
@@ -50,6 +57,13 @@
       "./media/rich/katex.min.css"
     ],
     "languages": [
+      {
+        "id": "markdown",
+        "extensions": [
+          ".mkdn",
+          ".mkdown"
+        ]
+      },
       {
         "id": "plantuml",
         "aliases": [
@@ -135,7 +149,83 @@
         "category": "md"
       }
     ],
+    "submenus": [
+      {
+        "id": "md.export",
+        "label": "md: Export"
+      }
+    ],
     "menus": {
+      "md.export": [
+        {
+          "command": "md.exportHtml",
+          "group": "md@1"
+        },
+        {
+          "command": "md.exportPdf",
+          "when": "!listMultiSelection",
+          "group": "md@2"
+        },
+        {
+          "command": "md.exportEpub",
+          "group": "md@3"
+        },
+        {
+          "command": "md.exportLatex",
+          "group": "md@4"
+        }
+      ],
+      "explorer/context": [
+        {
+          "submenu": "md.export",
+          "when": "resourceLangId == markdown",
+          "group": "md@1"
+        },
+        {
+          "command": "md.exportSvg",
+          "when": "(resourceLangId == plantuml || resourceLangId == graphviz) && !listMultiSelection",
+          "group": "md@2"
+        },
+        {
+          "command": "md.showDiagramPreview",
+          "when": "(resourceLangId == plantuml || resourceLangId == graphviz) && !listMultiSelection",
+          "group": "md@3"
+        }
+      ],
+      "editor/context": [
+        {
+          "submenu": "md.export",
+          "when": "editorLangId == markdown",
+          "group": "md@1"
+        },
+        {
+          "command": "md.exportSvg",
+          "when": "editorLangId == plantuml || editorLangId == graphviz",
+          "group": "md@2"
+        },
+        {
+          "command": "md.showDiagramPreview",
+          "when": "editorLangId == plantuml || editorLangId == graphviz",
+          "group": "md@3"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "submenu": "md.export",
+          "when": "resourceLangId == markdown",
+          "group": "md@1"
+        },
+        {
+          "command": "md.exportSvg",
+          "when": "resourceLangId == plantuml || resourceLangId == graphviz",
+          "group": "md@2"
+        },
+        {
+          "command": "md.showDiagramPreview",
+          "when": "resourceLangId == plantuml || resourceLangId == graphviz",
+          "group": "md@3"
+        }
+      ],
       "commandPalette": [
         {
           "command": "md.exportHtml",
@@ -249,6 +339,52 @@
           "default": "A4",
           "description": "Page size for PDF export and print, including the print-on-demand trim sizes.",
           "scope": "resource"
+        },
+        "md.lint.dialect": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Point out, in the Problems pane and as a faint underline, the places where md's deliberate subset of Markdown renders a document differently from GitHub or a CommonMark engine. Every one of them is reported at **Information** level and never higher: the Markdown is not wrong, it will simply look different here. Switch the individual rules off with `#md.lint.rules#`.",
+          "scope": "resource"
+        },
+        "md.lint.rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "rawHtml": {
+              "type": "boolean",
+              "default": true,
+              "description": "Raw HTML tags. md escapes them, so <b> appears as those three characters instead of turning the next word bold."
+            },
+            "referenceLink": {
+              "type": "boolean",
+              "default": true,
+              "description": "Reference-style links. md has none: the [text][label] and the [label]: url line are both printed as written."
+            },
+            "indentedCode": {
+              "type": "boolean",
+              "default": true,
+              "description": "Four-space indented code. md has no indented code block, so the lines become a paragraph and lose their indentation and monospaced type."
+            },
+            "tableAfterParagraph": {
+              "type": "boolean",
+              "default": true,
+              "description": "A table written directly under a paragraph. md needs a blank line above a table; without one the rows stay part of the paragraph."
+            },
+            "footnote": {
+              "type": "boolean",
+              "default": true,
+              "description": "A footnote definition nothing cites. md prints the note at the foot of the document anyway, with no number in the text and no link back to it, where a CommonMark engine prints nothing at all."
+            }
+          },
+          "default": {
+            "rawHtml": true,
+            "referenceLink": true,
+            "indentedCode": true,
+            "tableAfterParagraph": true,
+            "footnote": true
+          },
+          "markdownDescription": "Which dialect differences `#md.lint.dialect#` reports. Each is on unless it is set to `false`.",
+          "scope": "resource"
         }
       }
     }
@@ -265,6 +401,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "package": "npm run typecheck && npm run test && npm run compile && node scripts/package.mjs",
+    "publish:vsix": "node scripts/publish.mjs",
     "vscode:prepublish": "node scripts/prepublish.mjs"
   },
   "devDependencies": {
@@ -273,6 +410,7 @@
     "@types/vscode": "^1.95.0",
     "@vscode/vsce": "^3.2.1",
     "esbuild": "^0.24.2",
+    "ovsx": "^0.10.12",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

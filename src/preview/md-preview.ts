@@ -45,20 +45,39 @@
 //
 //  Consequences of the split that are visible to a reader of the page:
 //
-//    * PlantUML's Graphviz-backed layouts (class, activity, state, component)
-//      call the global `Viz` from inside the TeaVM engine. That global cannot
-//      exist here, so those diagrams never produce an SVG: they exhaust the
-//      20 s budget and fall back to their source text, exactly as a failed
-//      diagram does in the apps. Sequence, mindmap, gantt and json diagrams use
-//      PlantUML's own Smetana layout and are unaffected. This is a property of
-//      the built-in preview's policy, not something to work around here.
+//    * PlantUML draws about half of what it can draw, and the line is its own
+//      layout engine. The kinds it lays out by generating DOT — class, state,
+//      component, object, use-case, deployment, ER and the *legacy* activity
+//      syntax `(*) -->` — read the global `Viz` from inside the TeaVM engine
+//      about 90 ms in. That global cannot exist here, so the read throws, TeaVM
+//      cannot convert the JS error into a Java one, and the request is
+//      abandoned with the block empty: no SVG ever appears, the poll below
+//      exhausts its 20 s and `renderPlantUml` restores the source text, exactly
+//      as a failed diagram does in the apps. The kinds PlantUML lays out itself
+//      — sequence, the modern `start` / `if` / `stop` activity syntax, mindmap,
+//      gantt, json, yaml, wbs, salt, timing — draw in about 200 ms and never
+//      touch `Viz`. All of it measured in `test/plantuml-csp.test.ts`, which
+//      also pins the two fixes that do NOT work: `!pragma layout smetana` (and
+//      three other spellings) still takes the Viz path, and loading
+//      `viz-global.js` first only moves the failure to a WebAssembly
+//      `CompileError`. Those diagrams belong to the diagram panel and the
+//      exports, whose webviews add `'wasm-unsafe-eval'` and load Viz.js. This
+//      is a property of the built-in preview's policy, not something to work
+//      around here.
 //    * Byte parity lives in the *export* path, which we generate ourselves.
 //      What this file owes is visual parity inside a shell VS Code owns.
 //
 //  House rules for this file, each learned the hard way:
 //
-//    * No imports at module scope. This bundles to an IIFE that must run with
-//      nothing else loaded; the only way to get anything else is the nonce.
+//    * Nothing may be loaded at run time except through the nonce. This
+//      bundles to an IIFE that must run with nothing else present, so a
+//      `require`, a bare specifier or a runtime `import()` of anything but the
+//      engines below would simply not resolve in the page. A static import of
+//      a *pure module of ours* is a different thing and is allowed: esbuild
+//      inlines it into this same IIFE, and `preview/engines.ts` is imported
+//      that way so that the attribute the host writes and the attribute this
+//      file reads can never drift apart. Anything it reaches for must be as
+//      pure as it is — no `vscode`, no Node, no DOM at module scope.
 //    * Never call `acquireVsCodeApi()`. It may be called once per webview and
 //      the preview's own `index.js` has already called it — a second call
 //      throws and takes VS Code's preview down with it.
@@ -69,6 +88,8 @@
 //    * Never throw out of the top level. A failed engine must leave the block's
 //      source visible and the rest of the page alone.
 //
+
+import { wantedEngines, type ClientEngine } from './engines';
 
 // ---------------------------------------------------------------------------
 //  MARK: - Bootstrap
@@ -515,7 +536,17 @@ function resetRendered(root: ParentNode): void {
  *     failure mode is that error box, not a restored source, and marking from
  *     its own bookkeeping keeps the two in step.
  */
-async function renderMermaid(gen: number, root: ParentNode): Promise<void> {
+async function renderMermaid(
+  gen: number,
+  root: ParentNode,
+  wanted: ReadonlySet<ClientEngine>,
+): Promise<void> {
+  // `md.diagrams.mermaid`, arriving the only way a setting can arrive here —
+  // see {@link wantedEngines}. Checked before the DOM is even scanned, because
+  // "off" has to mean the 3.5 MB is never fetched, not merely that the result
+  // is discarded.
+  if (!wanted.has('mermaid')) return;
+
   // Tag-qualified, like the export paths' `pre.mermaid, div.plantuml,
   // div.graphviz` and unlike md-init's bare `.mermaid`. The host emits
   // `<pre class="mermaid">` and nothing else can: author HTML is escaped, never
@@ -663,7 +694,14 @@ function assignPlantUmlId(el: HTMLElement): void {
  * the next pass to trample. Waiting for the current block to settle first
  * leaves the engine idle.
  */
-async function renderPlantUml(gen: number, root: ParentNode): Promise<void> {
+async function renderPlantUml(
+  gen: number,
+  root: ParentNode,
+  wanted: ReadonlySet<ClientEngine>,
+): Promise<void> {
+  // `md.diagrams.plantuml`, as above — and here the saving is 7.4 MB.
+  if (!wanted.has('plantuml')) return;
+
   const pending = Array.from(root.querySelectorAll<HTMLElement>(`div.plantuml:not([${MARKER}])`));
   if (!pending.length) return;
 
@@ -759,6 +797,13 @@ async function pass(gen: number): Promise<void> {
   // it exists keeps us off the preview's own furniture.
   const root: ParentNode = document.querySelector('.markdown-body') ?? document.body;
 
+  // Which engines the reader has left switched on, for this document, read
+  // back from the wrapper the host emitted. The settings live in the extension
+  // host and this page cannot ask for them; the attribute is the whole channel.
+  // An absent attribute means this markup is not ours, and therefore that there
+  // is nothing here for us to draw — see `preview/engines.ts`.
+  const wanted = wantedEngines(root);
+
   // The theme switch is handled here, inside the queue, where no render is in
   // flight. VS Code mutates the body class in place rather than reloading, so
   // the diagrams already on screen are the only record of the old theme.
@@ -774,9 +819,9 @@ async function pass(gen: number): Promise<void> {
   // page testable from outside.
   document.documentElement.removeAttribute('data-md-render-complete');
 
-  await renderMermaid(gen, root);
+  await renderMermaid(gen, root, wanted);
   if (gen !== generation) return;
-  await renderPlantUml(gen, root);
+  await renderPlantUml(gen, root, wanted);
   if (gen !== generation) return;
 
   document.documentElement.setAttribute('data-md-render-complete', '1');
