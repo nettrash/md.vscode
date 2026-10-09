@@ -21,6 +21,55 @@ missing between the two, because the number is the family's rather than
 this extension's own count, and this extension has simply stepped into
 it.
 
+## [1.5.3] — 2026-10-09
+
+### Added
+
+- **Zoom for diagrams.** A diagram is drawn to fit the page, and a large one
+  — a sequence diagram thousands of pixels wide — came out too small to
+  read, with no way to look closer. In the Markdown preview, hovering a
+  Mermaid, PlantUML or Graphviz diagram now shows a small **− Fit +**
+  control that zooms that one figure; past the page's width it scrolls
+  sideways in its own block, and **Fit** puts it back. The zoom stays put
+  as you type, though the preview redraws on every edit. In the diagram
+  panel, **Zoom In**, **Zoom Out** and **Reset Zoom** are buttons in the
+  panel's title bar and commands in the palette, on **Ctrl** / **⌘** with
+  **+**, **−** and **0** while the panel is the active editor (nowhere
+  else: VS Code's own window zoom keeps those keys everywhere else), and
+  the panel remembers its zoom across the redraw an edit causes. In both,
+  **Ctrl** / **⌘** with the scroll wheel, or a trackpad pinch, zooms the
+  diagram under the pointer, a step at a time from 25% to 500%.
+
+## [1.5.2] — 2026-10-09
+
+### Fixed
+
+- **A PlantUML diagram with light colours of its own is readable in a dark
+  theme.** In a dark theme md asks PlantUML for its dark palette, which
+  writes every label in white — and keeps the fills an author chose, so
+  white text sat on the diagram's own pastel boxes, participants and notes
+  and could not be read: a diagram grouped into light `box` sections came
+  up as empty boxes. A diagram that paints light fills of its own is now
+  drawn the way it was designed, in PlantUML's light palette, on a white
+  card, in the preview and in the diagram panel. A diagram without colours
+  of its own, or with dark ones, still follows the theme.
+
+## [1.5.1] — 2026-10-09
+
+### Fixed
+
+- **A PlantUML diagram that uses `skinparam ParticipantPadding` draws as
+  written again.** The bundled PlantUML engine no longer honours that
+  skinparam: it ignored the value and printed "Please use CSS style
+  instead of skinparam ParticipantPadding" across the top of the diagram,
+  so a sequence diagram written for any earlier PlantUML came up with a
+  warning banner and its participants crowded together. md now hands the
+  engine the style it reads instead — the participants' horizontal margin,
+  measured to lay out the way the skinparam did — so the diagram draws
+  with its spacing and without the warning, in the preview, the diagram
+  panel and every export. A `.puml` file and a `plantuml` or `puml` fence
+  are both covered; the file on disk is never changed.
+
 ## [1.5] — 2026-09-23
 
 ### Added

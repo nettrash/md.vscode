@@ -107,6 +107,8 @@ import { richRoot } from '../engines/paths';
 import { instrument, makeNonce } from '../export/renderHost';
 import type { EngineNeeds } from '../render/html';
 import { renderBody, isRawGraphviz, isRawPlantUML } from '../render/html';
+import { paintsOwnLightFills } from '../render/plantuml-palette';
+import { NATURAL_WIDTH_JS, NEXT_ZOOM_JS, ZOOM_LEVELS } from '../render/zoom';
 import { escapeHTML } from '../render/inline';
 import { isDarkTheme } from './config';
 
@@ -167,6 +169,12 @@ export function registerDiagramPreviews(context: vscode.ExtensionContext): void 
       // PlantUML diagram sits in a dark panel until the next keystroke.
       for (const preview of panels.values()) preview.themeChanged();
     }),
+    // Zoom In / Zoom Out / Reset Zoom: the title-bar buttons and Ctrl/⌘ +, −, 0,
+    // offered only while a diagram panel is the active editor (the manifest's
+    // `activeWebviewPanelId` clauses), and acting on that panel.
+    vscode.commands.registerCommand('md.zoomIn', () => activePanel()?.zoomBy('in')),
+    vscode.commands.registerCommand('md.zoomOut', () => activePanel()?.zoomBy('out')),
+    vscode.commands.registerCommand('md.zoomReset', () => activePanel()?.zoomBy('reset')),
     // `context.subscriptions` is disposed on deactivation, so this is what
     // guarantees no panel outlives us. A leaked one holds a Chromium context
     // with up to 11 MB of engines in it.
@@ -196,6 +204,12 @@ export function openDiagramPreview(document: vscode.TextDocument): void {
   const preview = new DiagramPreview(document, key);
   panels.set(key, preview);
   preview.refresh();
+}
+
+/** The diagram panel that is the active editor, if one is. */
+function activePanel(): DiagramPreview | undefined {
+  for (const preview of panels.values()) if (preview.active) return preview;
+  return undefined;
 }
 
 /** Close every panel. Idempotent; called on deactivation and safe to call twice. */
@@ -235,6 +249,13 @@ class DiagramPreview {
    * an identical picture.
    */
   private lastDocument = '';
+  /**
+   * The reader's zoom, carried across the page rebuilds an edit causes: null is
+   * Fit, a number a scale of the diagram's natural size. The page reports every
+   * change it makes (keys, buttons and Ctrl+scroll alike) and gets it back in
+   * the next page it is given.
+   */
+  private zoom: number | null = null;
 
   constructor(document: vscode.TextDocument, key: string) {
     this.document = document;
@@ -277,7 +298,18 @@ class DiagramPreview {
       // raises `data-md-render-complete`. Nothing else is spoken on this
       // channel: the diagram panel captures nothing.
       if (isReady(message)) this.settle?.();
+      else if (isZoom(message)) this.zoom = message.zoom;
     });
+  }
+
+  /** True while this panel is the active editor — the one the zoom commands mean. */
+  get active(): boolean {
+    return this.panel.active;
+  }
+
+  /** Zoom in, out or back to Fit; the page does it, and reports the result back. */
+  zoomBy(action: ZoomAction): void {
+    void this.panel.webview.postMessage({ type: 'md.zoom', action });
   }
 
   /** Bring the panel forward without stealing the caret. */
@@ -399,7 +431,8 @@ class DiagramPreview {
         head: `<style data-md-host="1">\n${CHROME_CSS}\n</style>`,
         body:
           `${statusBar(kind)}\n` +
-          `<script nonce="${nonce}" data-md-host="1">\n${CHROME_CLIENT}\n</script>`,
+          `<script nonce="${nonce}" data-md-host="1">\n` +
+          `${CHROME_CLIENT.replace('__MD_INITIAL_ZOOM__', JSON.stringify(this.zoom))}\n</script>`,
       },
     );
   }
@@ -464,6 +497,12 @@ function diagramDocument(source: string, title: string, dark: boolean): string {
   // engine runs in it exactly as it does in the apps. `sourceLines` is scroll
   // sync, which belongs to a preview that has an editor to sync with.
   const { html, needs } = renderBody(source, { title, dark });
+  // A PlantUML file that paints its own light fills is drawn light, on a light
+  // card, even in a dark theme: the engine's dark palette writes every label in
+  // white, which cannot be read on the author's pastels (`paintsOwnLightFills`).
+  // `data-md-dark` is the only channel to the engine, and this page holds one
+  // diagram, so turning it off here touches nothing else.
+  const light = dark && isRawPlantUML(source) && paintsOwnLightFills(source);
 
   return [
     '<!DOCTYPE html>',
@@ -474,7 +513,7 @@ function diagramDocument(source: string, title: string, dark: boolean): string {
     `<title>${escapeHTML(title)}</title>`,
     engineTags(needs),
     '</head>',
-    `<body data-md-dark="${dark ? '1' : '0'}">`,
+    light ? '<body data-md-dark="0" data-md-palette="light">' : `<body data-md-dark="${dark ? '1' : '0'}">`,
     html,
     '<script type="module" src="rich/md-init.js"></script>',
     '</body>',
@@ -818,6 +857,16 @@ body[data-md-diagram-state="drawn"] > div.plantuml,
 body[data-md-diagram-state="drawn"] > div.graphviz {
     display: flex;
 }
+/* A PlantUML file drawn in the light palette in a dark theme (see
+   \`paintsOwnLightFills\`) sits on a light card: the engine paints no ground of
+   its own, and its black text outside the author's boxes would otherwise vanish
+   into the panel. */
+body[data-md-palette="light"] > div.plantuml > svg {
+    background: #ffffff;
+    padding: 12px;
+    border-radius: 6px;
+    box-sizing: border-box;
+}
 body[data-md-diagram-state="drawn"] > div.plantuml > svg,
 body[data-md-diagram-state="drawn"] > div.graphviz > svg {
     /* Centred by auto margins rather than by align-items / justify-content. A
@@ -854,6 +903,27 @@ body[data-md-diagram-state="drawn"] > div.graphviz > svg {
 body[data-md-diagram="none"] .md-diagram-status {
     margin-top: 1.5em;
 }
+/* The zoom level, shown for a moment after it changes and then gone. */
+.md-zoom-badge {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-family: var(--vscode-font-family, sans-serif);
+    font-size: var(--vscode-font-size, 13px);
+    font-variant-numeric: tabular-nums;
+    color: var(--vscode-editorWidget-foreground, var(--md-panel-ink));
+    background: var(--vscode-editorWidget-background, var(--md-panel-paper));
+    border: 1px solid var(--md-panel-border);
+    box-shadow: 0 1px 4px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.2));
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+.md-zoom-badge[data-shown] {
+    opacity: 1;
+}
 .md-diagram-status[data-state="failed"] {
     color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground));
     background: var(--vscode-inputValidation-errorBackground, var(--vscode-editorWidget-background));
@@ -866,15 +936,18 @@ body[data-md-diagram="none"] .md-diagram-status {
  *
  * **It must never call `acquireVsCodeApi()`.** The capture client alongside it
  * already has, a second call throws, and the two scripts share this page — so
- * this one talks to nobody and only reads and writes its own DOM. Everything
- * the host needs to know already arrives on the capture client's `ready`
- * message.
+ * this one only reads and writes its own DOM. Everything the host needs to know
+ * arrives through the capture client: its own `ready` message, and the one
+ * thing this script says, a changed zoom, which it dispatches as an
+ * `md-host-post` event for the capture client to relay (see `renderHost.ts`).
+ * It hears the host's zoom commands as ordinary `message` events, which needs
+ * no API at all.
  *
  * Written as a string rather than bundled for the same reason `CAPTURE_CLIENT`
  * is: it is thirty lines with no imports, and keeping it beside the CSS and the
  * status markup it drives is what stops the three drifting apart.
  */
-const CHROME_CLIENT = `(function () {
+export const CHROME_CLIENT = `(function () {
   var body = document.body;
   var stage = document.querySelector('body > div.plantuml, body > div.graphviz');
   var status = document.querySelector('.md-diagram-status');
@@ -888,6 +961,72 @@ const CHROME_CLIENT = `(function () {
   body.setAttribute('data-md-diagram',
     stage.classList.contains('plantuml') ? 'plantuml' : 'graphviz');
   body.setAttribute('data-md-diagram-state', 'pending');
+
+  // ── Zoom. Fit (null) is how the diagram arrives: no wider than the panel. A
+  // number is a scale of the diagram's natural size. The host keeps the last
+  // one across the page rebuilds an edit causes and writes it in below; a
+  // change made here is reported back through the capture client, the one
+  // script on this page allowed to talk to the host (see the note above).
+  var zoom = __MD_INITIAL_ZOOM__;
+  ${NEXT_ZOOM_JS}
+  ${NATURAL_WIDTH_JS}
+  var badge = null;
+  var badgeTimer = 0;
+  var wheelCredit = 0;
+  function diagram() { return stage.querySelector('svg'); }
+  function size() {
+    var svg = diagram();
+    if (!svg) return;
+    if (!svg.hasAttribute('data-md-style')) svg.setAttribute('data-md-style', svg.getAttribute('style') || '');
+    var own = svg.getAttribute('data-md-style') || '';
+    if (zoom === null) {
+      if (own) svg.setAttribute('style', own); else svg.removeAttribute('style');
+      return;
+    }
+    var width = Math.round(mdNaturalWidth(svg) * zoom);
+    svg.setAttribute('style', own + (own && !/;\s*$/.test(own) ? ';' : '') +
+      'width:' + width + 'px;max-width:none;height:auto');
+  }
+  function showLevel() {
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.className = 'md-zoom-badge';
+      badge.setAttribute('role', 'status');
+      body.appendChild(badge);
+    }
+    badge.textContent = zoom === null ? 'Fit' : Math.round(zoom * 100) + '%';
+    badge.setAttribute('data-shown', '1');
+    window.clearTimeout(badgeTimer);
+    badgeTimer = window.setTimeout(function () { badge.removeAttribute('data-shown'); }, 1200);
+  }
+  function setZoom(next) {
+    zoom = next;
+    size();
+    showLevel();
+    document.dispatchEvent(new CustomEvent('md-host-post', { detail: { type: 'zoom', zoom: zoom } }));
+  }
+  function step(direction) {
+    var svg = diagram();
+    if (!svg) return;
+    var now = zoom === null ? svg.getBoundingClientRect().width / mdNaturalWidth(svg) : zoom;
+    setZoom(mdNextZoom(now, direction));
+  }
+  window.addEventListener('message', function (event) {
+    var message = event.data;
+    if (!message || message.type !== 'md.zoom') return;
+    if (message.action === 'in') step(1);
+    else if (message.action === 'out') step(-1);
+    else if (message.action === 'reset') setZoom(null);
+  });
+  stage.addEventListener('wheel', function (event) {
+    if (!(event.ctrlKey || event.metaKey) || !diagram()) return;
+    event.preventDefault();
+    // A trackpad pinch is many small deltas: one step per 40 or so of them.
+    wheelCredit += event.deltaY;
+    if (Math.abs(wheelCredit) < 40) return;
+    step(wheelCredit < 0 ? 1 : -1);
+    wheelCredit = 0;
+  }, { passive: false });
 
   // md-init.js raises this when every engine has settled — the same flag every
   // export waits on. It cannot be up yet: this script runs while the document is
@@ -905,6 +1044,7 @@ const CHROME_CLIENT = `(function () {
     // <svg> behind.
     var drawn = !!stage.querySelector('svg');
     body.setAttribute('data-md-diagram-state', drawn ? 'drawn' : 'failed');
+    if (drawn && zoom !== null) size();
     if (status) {
       if (drawn) {
         status.remove();
@@ -925,6 +1065,22 @@ const CHROME_CLIENT = `(function () {
     });
   }
 })();`;
+
+/** What the zoom commands ask the page to do. */
+export type ZoomAction = 'in' | 'out' | 'reset';
+
+/**
+ * The page's report of a zoom it changed: Fit, or a scale on the ladder. Checked
+ * against the ladder's own bounds, because the message is the page's word and a
+ * value outside them would be written back into every page that follows.
+ */
+function isZoom(message: unknown): message is { type: 'zoom'; zoom: number | null } {
+  if (typeof message !== 'object' || message === null) return false;
+  const { type, zoom } = message as { type?: unknown; zoom?: unknown };
+  if (type !== 'zoom') return false;
+  if (zoom === null) return true;
+  return typeof zoom === 'number' && zoom >= ZOOM_LEVELS[0] && zoom <= ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+}
 
 /** The capture client's unprompted "the engines have settled" message. */
 function isReady(message: unknown): boolean {

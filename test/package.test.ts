@@ -114,6 +114,9 @@ interface Manifest {
 const manifest = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as Manifest;
 const { commands, configuration, grammars, languages, menus, submenus } = manifest.contributes;
 
+/** The diagram panel being the active editor — the zoom commands' one place. */
+const PANEL = "activeWebviewPanelId == 'md.diagramPreview'";
+
 /** One menu's rows, or a failure naming the menu rather than `undefined is not iterable`. */
 const menu = (id: string): readonly MenuItem[] => {
   const rows = menus[id];
@@ -312,6 +315,11 @@ describe('contributes.menus — where the commands are offered', () => {
         when: 'editorLangId == plantuml || editorLangId == graphviz',
         group: 'navigation',
       },
+      // And, from 1.5.3, the diagram panel's own zoom buttons — on the panel's
+      // title bar only, ordered − Fit +.
+      { command: 'md.zoomOut', when: PANEL, group: 'navigation@1' },
+      { command: 'md.zoomReset', when: PANEL, group: 'navigation@2' },
+      { command: 'md.zoomIn', when: PANEL, group: 'navigation@3' },
     ]);
   });
 
@@ -329,7 +337,41 @@ describe('contributes.menus — where the commands are offered', () => {
         command: 'md.showDiagramPreview',
         when: 'editorLangId == plantuml || editorLangId == graphviz',
       },
+      { command: 'md.zoomIn', when: PANEL },
+      { command: 'md.zoomOut', when: PANEL },
+      { command: 'md.zoomReset', when: PANEL },
     ]);
+  });
+});
+
+describe('contributes.keybindings — zoom, and only in the diagram panel', () => {
+  const keybindings = (manifest.contributes as unknown as {
+    keybindings: readonly { command: string; key: string; mac?: string; when?: string }[];
+  }).keybindings;
+
+  it('binds Ctrl/⌘ +, −, 0 and their keypad keys to the three zoom commands', () => {
+    expect(keybindings.map((k) => [k.command, k.key, k.mac])).toEqual([
+      ['md.zoomIn', 'ctrl+=', 'cmd+='],
+      ['md.zoomIn', 'ctrl+numpad_add', 'cmd+numpad_add'],
+      ['md.zoomOut', 'ctrl+-', 'cmd+-'],
+      ['md.zoomOut', 'ctrl+numpad_subtract', 'cmd+numpad_subtract'],
+      ['md.zoomReset', 'ctrl+0', 'cmd+0'],
+      ['md.zoomReset', 'ctrl+numpad0', 'cmd+numpad0'],
+    ]);
+  });
+
+  it('never takes the workbench zoom keys anywhere but the diagram panel', () => {
+    // Without the clause these would replace VS Code's own window zoom
+    // everywhere, which nobody installing a Markdown extension asked for.
+    for (const k of keybindings) expect(k.when, k.key).toBe(PANEL);
+  });
+
+  it('declares the commands it binds, each with an icon for the title bar', () => {
+    for (const id of ['md.zoomIn', 'md.zoomOut', 'md.zoomReset']) {
+      const command = commands.find((entry) => entry.command === id) as { icon?: string } | undefined;
+      expect(command, id).toBeDefined();
+      expect(command?.icon, id).toMatch(/^\$\([a-z-]+\)$/);
+    }
   });
 });
 

@@ -267,7 +267,7 @@ export function renderBody(source: string, opts: RenderOptions): { html: string;
     // The decoration is applied to this return as well as to the Markdown one:
     // a `.puml` file opened in the editor gets a preview like any other
     // document, and its one block is exactly as exposed to a morph.
-    const plantuml = `<div class="plantuml">${escapeHTML(source)}</div>`;
+    const plantuml = `<div class="plantuml">${escapeHTML(modernizePlantUml(source))}</div>`;
     return {
       html: opts.diagramSources === true ? withDiagramSources(plantuml) : plantuml,
       needs: { math: false, mermaid: false, plantuml: true, graphviz: false, highlight: false },
@@ -438,7 +438,7 @@ function renderCodeBlock(language: string | null, code: string, opts: RenderOpti
     return `<pre class="mermaid">${escapeHTML(code)}</pre>`;
   }
   if (lang === 'plantuml' || lang === 'puml' || lang === 'plant-uml') {
-    return `<div class="plantuml">${escapeHTML(code)}</div>`;
+    return `<div class="plantuml">${escapeHTML(modernizePlantUml(code))}</div>`;
   }
   const engine = graphvizEngines[lang];
   if (engine !== undefined) {
@@ -880,6 +880,39 @@ function withFootnotes(body: string, definitions: { id: string; text: string }[]
  */
 function newlineSetLines(source: string): string[] {
   return source.split(/\r\n|[\n\v\f\r\u0085\u2028\u2029]/u);
+}
+
+/**
+ * PlantUML source as the bundled engine needs it to mean what its author wrote.
+ *
+ * The engine (1.2026.4beta4, `media/rich/plantuml.js`, the same bytes every md
+ * app carries) no longer honours `skinparam ParticipantPadding N`: it ignores
+ * the value and prints "Please use CSS style instead of skinparam
+ * ParticipantPadding" across the top of the diagram. Diagrams written for older
+ * PlantUML — most of them — use the skinparam, so a sequence diagram that draws
+ * cleanly elsewhere came up in md with a warning banner and its participants
+ * crowded together.
+ *
+ * Each such line is replaced, in place, by the style the engine reads instead —
+ * `sequenceDiagram { participant { Margin 0 N } }`. Measured in headless Chrome
+ * against the bundled engine (2026-10-09): it spaces participants apart
+ * horizontally and leaves the height alone, which is what the skinparam did, and
+ * no warning is drawn. The style is three lines because the engine rejects a
+ * one-line `<style>…</style>` as a syntax error; three is the fewest, so a
+ * PlantUML error message points at most two lines past where it would have.
+ *
+ * Only the single-line form is rewritten. `skinparam padding N` is left alone:
+ * the engine still applies that one and merely warns, so translating it would
+ * change a layout that works. A source with nothing to rewrite is returned
+ * unchanged, byte for byte.
+ */
+export function modernizePlantUml(source: string): string {
+  if (!/participantpadding/i.test(source)) return source;
+  return source.replace(
+    /^([ \t]*)skinparam[ \t]+participantpadding[ \t]+(\d+(?:\.\d+)?)[ \t]*$/gim,
+    (_line, indent: string, value: string) =>
+      `${indent}<style>\n${indent}sequenceDiagram { participant { Margin 0 ${value} } }\n${indent}</style>`,
+  );
 }
 
 /**

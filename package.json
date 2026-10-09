@@ -2,7 +2,7 @@
   "name": "md-vscode",
   "displayName": "md",
   "description": "Markdown preview with math, chemistry, charts and diagrams: KaTeX, Mermaid, Graphviz, PlantUML and a built-in plotter, all on-device with nothing sent anywhere. Exports to HTML, PDF, EPUB, LaTeX and SVG.",
-  "version": "1.5.0",
+  "version": "1.5.3",
   "publisher": "nettrash",
   "license": "MIT",
   "author": {
@@ -147,6 +147,24 @@
         "command": "md.showDiagramPreview",
         "title": "Preview Diagram",
         "category": "md"
+      },
+      {
+        "command": "md.zoomIn",
+        "title": "Zoom In",
+        "category": "md",
+        "icon": "$(zoom-in)"
+      },
+      {
+        "command": "md.zoomOut",
+        "title": "Zoom Out",
+        "category": "md",
+        "icon": "$(zoom-out)"
+      },
+      {
+        "command": "md.zoomReset",
+        "title": "Reset Zoom",
+        "category": "md",
+        "icon": "$(screen-normal)"
       }
     ],
     "submenus": [
@@ -250,6 +268,18 @@
         {
           "command": "md.showDiagramPreview",
           "when": "editorLangId == plantuml || editorLangId == graphviz"
+        },
+        {
+          "command": "md.zoomIn",
+          "when": "activeWebviewPanelId == 'md.diagramPreview'"
+        },
+        {
+          "command": "md.zoomOut",
+          "when": "activeWebviewPanelId == 'md.diagramPreview'"
+        },
+        {
+          "command": "md.zoomReset",
+          "when": "activeWebviewPanelId == 'md.diagramPreview'"
         }
       ],
       "editor/title": [
@@ -257,9 +287,62 @@
           "command": "md.showDiagramPreview",
           "when": "editorLangId == plantuml || editorLangId == graphviz",
           "group": "navigation"
+        },
+        {
+          "command": "md.zoomOut",
+          "when": "activeWebviewPanelId == 'md.diagramPreview'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "md.zoomReset",
+          "when": "activeWebviewPanelId == 'md.diagramPreview'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "md.zoomIn",
+          "when": "activeWebviewPanelId == 'md.diagramPreview'",
+          "group": "navigation@3"
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "md.zoomIn",
+        "key": "ctrl+=",
+        "mac": "cmd+=",
+        "when": "activeWebviewPanelId == 'md.diagramPreview'"
+      },
+      {
+        "command": "md.zoomIn",
+        "key": "ctrl+numpad_add",
+        "mac": "cmd+numpad_add",
+        "when": "activeWebviewPanelId == 'md.diagramPreview'"
+      },
+      {
+        "command": "md.zoomOut",
+        "key": "ctrl+-",
+        "mac": "cmd+-",
+        "when": "activeWebviewPanelId == 'md.diagramPreview'"
+      },
+      {
+        "command": "md.zoomOut",
+        "key": "ctrl+numpad_subtract",
+        "mac": "cmd+numpad_subtract",
+        "when": "activeWebviewPanelId == 'md.diagramPreview'"
+      },
+      {
+        "command": "md.zoomReset",
+        "key": "ctrl+0",
+        "mac": "cmd+0",
+        "when": "activeWebviewPanelId == 'md.diagramPreview'"
+      },
+      {
+        "command": "md.zoomReset",
+        "key": "ctrl+numpad0",
+        "mac": "cmd+numpad0",
+        "when": "activeWebviewPanelId == 'md.diagramPreview'"
+      }
+    ],
     "configuration": {
       "title": "md",
       "properties": {

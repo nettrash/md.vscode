@@ -432,6 +432,14 @@ const CAPTURE_CLIENT = `(function () {
     return document.documentElement.getAttribute('data-md-render-complete') === '1';
   }
   function announce() { api.postMessage({ type: 'ready' }); }
+
+  // The relay for a page script that may not call acquireVsCodeApi() itself —
+  // the diagram panel's, which reports a zoom it changed. One message type, and
+  // nothing else passes: every export page carries this client too.
+  document.addEventListener('md-host-post', function (event) {
+    var detail = event.detail;
+    if (detail && detail.type === 'zoom') api.postMessage({ type: 'zoom', zoom: detail.zoom });
+  });
   if (complete()) {
     announce();
   } else {

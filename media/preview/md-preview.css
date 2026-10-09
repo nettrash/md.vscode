@@ -622,6 +622,20 @@ body .markdown-body .plot svg {
 	height: auto;
 }
 
+/* A PlantUML diagram that paints its own light fills is drawn in the engine's
+   light palette even in a dark theme (see `paintsOwnLightFills` in
+   src/render/plantuml-palette.ts): white dark-palette text cannot be read on
+   the author's pastels. The engine paints no background of its own, so the
+   figure gets a light card to sit on, or its black text outside the boxes
+   would vanish into the page. The script sets the attribute only in a dark
+   theme. */
+body .markdown-body .plantuml[data-md-palette="light"] svg {
+	background: #ffffff;
+	padding: 12px;
+	border-radius: 6px;
+	box-sizing: border-box;
+}
+
 /* Mermaid and PlantUML are not restyled here, and that is a decision rather
    than an omission. Mermaid writes its own theme stylesheet into every SVG it
    draws, and PlantUML takes a `dark` flag into the engine; both read the
@@ -715,4 +729,47 @@ body .markdown-body .md-footnotes li {
 body .markdown-body .md-fnback {
 	text-decoration: none;
 	color: var(--md-accent);
+}
+
+/* The zoom control (src/preview/zoom-ui.ts): one small toolbar on <body>,
+   outside the document, moved over whichever diagram the pointer is on. It is
+   VS Code furniture rather than part of the page, so it wears the workbench's
+   widget colours, not md's paper. */
+body .md-zoom {
+	position: absolute;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	padding: 2px;
+	border-radius: 4px;
+	border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+	background: var(--vscode-editorWidget-background, #f3f3f3);
+	box-shadow: 0 1px 4px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.2));
+	font-family: var(--vscode-font-family, sans-serif);
+	font-size: 12px;
+	line-height: 1;
+	user-select: none;
+}
+body .md-zoom button {
+	min-width: 24px;
+	height: 22px;
+	padding: 0 6px;
+	border: none;
+	border-radius: 3px;
+	background: transparent;
+	color: var(--vscode-editorWidget-foreground, var(--vscode-foreground, #333));
+	font: inherit;
+	cursor: pointer;
+}
+body .md-zoom button:hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
+}
+body .md-zoom button:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder, #0078d4);
+	outline-offset: -1px;
+}
+body .md-zoom .md-zoom-level {
+	min-width: 44px;
+	font-variant-numeric: tabular-nums;
 }

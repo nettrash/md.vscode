@@ -90,6 +90,8 @@
 //
 
 import { wantedEngines, type ClientEngine } from './engines';
+import { paintsOwnLightFills } from '../render/plantuml-palette';
+import { applyZooms, installZoom, isZoomControl } from './zoom-ui';
 
 // ---------------------------------------------------------------------------
 //  MARK: - Bootstrap
@@ -383,6 +385,21 @@ function loadPlantUml(): Promise<PlantUmlModule> {
 // ---------------------------------------------------------------------------
 //  MARK: - The rendered-diagram cache
 // ---------------------------------------------------------------------------
+
+/**
+ * Whether this PlantUML block is drawn in the light palette although the
+ * workbench is dark — because its author painted light fills of their own
+ * (`paintsOwnLightFills`), which the engine's white dark-palette text cannot be
+ * read on. Marks the block `data-md-palette="light"` so the stylesheet gives it
+ * a light card, and clears the mark otherwise. The cache key needs nothing
+ * extra: the answer follows from the theme and the source, and both are in it.
+ */
+function paletteFor(el: HTMLElement, source: string): boolean {
+  const light = dark && paintsOwnLightFills(source);
+  if (light) el.setAttribute('data-md-palette', 'light');
+  else el.removeAttribute('data-md-palette');
+  return light;
+}
 
 function cacheKey(kind: string, source: string): string {
   return (dark ? 'd' : 'l') + SEPARATOR + kind + SEPARATOR + source;
@@ -717,6 +734,7 @@ async function renderPlantUml(
     if (source === null) continue;
     const cached = cache.get(cacheKey('plantuml', source));
     if (typeof cached === 'string') {
+      paletteFor(el, source);
       el.innerHTML = cached;
       markerFor(el, 'plantuml');
     } else if (cached === null) {
@@ -755,8 +773,11 @@ async function renderPlantUml(
     el.textContent = '';
     try {
       // `dark` must be a real boolean: the engine tests `opts.dark === true`,
-      // so `{dark: 1}` would silently render light.
-      render(lines, el.id, { dark });
+      // so `{dark: 1}` would silently render light. A diagram that paints its
+      // own light fills is drawn light, on a light card, whatever the theme —
+      // see `paintsOwnLightFills`.
+      const light = paletteFor(el, source);
+      render(lines, el.id, { dark: dark && !light });
       const ok = await waitForSvg(el, PLANTUML_TIMEOUT_MS);
       // The double check is deliberate: the poll may have timed out on the very
       // tick the SVG appeared. A failed or timed-out render must never leave the
@@ -823,6 +844,10 @@ async function pass(gen: number): Promise<void> {
   if (gen !== generation) return;
   await renderPlantUml(gen, root, wanted);
   if (gen !== generation) return;
+
+  // A zoom the reader set lives outside the DOM (`zoom-ui.ts`): this pass, or
+  // the morph before it, has just thrown away any size on the diagrams.
+  applyZooms(root);
 
   document.documentElement.setAttribute('data-md-render-complete', '1');
 }
@@ -905,7 +930,9 @@ if (RICH) {
     let theme = false;
     for (const record of records) {
       if (record.type === 'attributes') theme = true;
-      else content = true;
+      // The zoom control is ours, lives on <body> and is built on first hover;
+      // adding it is not new content and must not cost a render pass.
+      else if (![...Array.from(record.addedNodes), ...Array.from(record.removedNodes)].every(isZoomControl)) content = true;
     }
     if (theme) themeChanged();
     if (content) schedule();
@@ -917,6 +944,8 @@ if (RICH) {
   });
 
   window.addEventListener('vscode.markdown.updateContent', () => schedule());
+
+  installZoom(sourceOf);
 
   // The content may already be in place: this script is injected `async`, so it
   // can just as easily run after the preview's own script as before it.

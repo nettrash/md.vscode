@@ -135,6 +135,17 @@ syntax — show their source instead, after a pause. They are not lost:
 HTML, PDF, EPUB, SVG — draws them too, because those render in a webview
 this extension owns and can allow WebAssembly in.
 
+### Zooming a diagram
+
+A diagram is drawn to fit the page, which leaves a large one too small to
+read. Hover a Mermaid, PlantUML or Graphviz diagram in the preview and a
+small **− Fit +** control appears over it: it zooms that one figure, which
+then scrolls sideways inside its own block, and **Fit** puts it back. In
+the diagram panel the same three are buttons in the panel's title bar, and
+**Ctrl** / **⌘** with **+**, **−** and **0** work while the panel is active.
+In both, **Ctrl** / **⌘** with the scroll wheel, or a trackpad pinch, zooms
+the diagram under the pointer. The panel keeps its zoom as you edit.
+
 ### CSV and TSV blocks
 
 A fenced ` ```csv ` or ` ```tsv ` block is drawn as a table, quoted fields
@@ -260,7 +271,7 @@ expressions is a character class rather than a citation. Switch it off entirely 
 
 ## Commands
 
-All six appear in the Command Palette under the **md** category, and in
+All of them appear in the Command Palette under the **md** category, and in
 the context menus below.
 
 | Command | What it does | Offered when |
@@ -271,6 +282,7 @@ the context menus below.
 | **md: Export as LaTeX…** | `.tex` source, mathematics kept as mathematics | a Markdown editor is active, or Markdown files are selected — in batch too |
 | **md: Export Diagram as SVG…** | One Mermaid, Graphviz or PlantUML diagram, or one chart, as a vector file | a Markdown, PlantUML or Graphviz editor is active, or one diagram file is selected |
 | **md: Preview Diagram** | Opens the diagram panel beside a diagram file | a PlantUML or Graphviz editor is active, or one diagram file is selected |
+| **md: Zoom In** / **Zoom Out** / **Reset Zoom** | Zoom the diagram in the diagram panel; Reset fits it to the panel again (Ctrl / ⌘ +, −, 0) | the diagram panel is the active editor |
 
 Mathematics is not on the SVG list, because KaTeX sets a formula as HTML
 and text and there is no vector drawing to hand over.
