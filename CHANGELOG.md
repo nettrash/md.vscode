@@ -14,8 +14,8 @@ its own.
 
 This extension began at its own 1.0 rather than as a continuation of the
 apps' 1.3 line, and this file has said since that release that it would
-join the family's number at the next family one. It has. The section
-below is **1.5**, the number the iPhone, iPad, Mac, Windows and Android
+join the family's number at the next family one. It has. The **1.5**
+section below is the number the iPhone, iPad, Mac, Windows and Android
 apps all carry from this date, and it follows 1.2 directly: nothing is
 missing between the two, because the number is the family's rather than
 this extension's own count, and this extension has simply stepped into
@@ -25,13 +25,15 @@ it.
 
 ### Added
 
-- **md works in Restricted Mode and in virtual workspaces.** A folder you
-  have not trusted, or a repository opened through GitHub Repositories,
-  used to get the plain built-in preview and a "some extensions are
-  disabled" banner, because md declared no support for either. It now
-  declares both: it runs nothing the folder supplies and writes nothing
-  unless you export. In Restricted Mode `md.preview.bodyFont` and
-  `md.preview.codeFont` are read from your user settings only. (#1)
+- **md works in Restricted Mode.** A folder you have not trusted used to
+  get the plain built-in preview and a "some extensions are disabled"
+  banner, because md declared no support for untrusted workspaces — VS
+  Code's default for an extension with code. It now declares limited
+  support: it runs nothing the folder supplies and writes nothing unless
+  you export, and in Restricted Mode `md.preview.bodyFont` and
+  `md.preview.codeFont` are read from your user settings only. Support
+  for virtual workspaces such as GitHub Repositories, which VS Code
+  already assumed, is now declared explicitly as well. (#1)
 
 ## [1.5.3] — 2026-10-09
 
