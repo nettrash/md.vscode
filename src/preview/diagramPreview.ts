@@ -106,7 +106,7 @@ import * as vscode from 'vscode';
 import { richRoot } from '../engines/paths';
 import { instrument, makeNonce } from '../export/renderHost';
 import type { EngineNeeds } from '../render/html';
-import { renderBody, isRawGraphviz, isRawPlantUML } from '../render/html';
+import { rawDiagramKind, renderBody, isRawPlantUML } from '../render/html';
 import { paintsOwnLightFills } from '../render/plantuml-palette';
 import { NATURAL_WIDTH_JS, NEXT_ZOOM_JS, ZOOM_LEVELS } from '../render/zoom';
 import { MERMAID_LANGUAGE, renderableSource } from '../render/mermaid-file';
@@ -386,7 +386,7 @@ class DiagramPreview {
     // live — but it still reaches the engines through `data-md-dark`, and it is
     // part of the fingerprint below for precisely that reason: the same file in
     // the other polarity is a different page and must be rebuilt.
-    const rendered = diagramDocument(source, name, isDarkTheme());
+    const rendered = diagramDocument(source, name, isDarkTheme(), languageId);
     if (rendered === this.lastDocument) return;
     this.lastDocument = rendered;
 
@@ -399,6 +399,12 @@ class DiagramPreview {
     });
   }
 
+  /** The file's language now — the same live-document rule as {@link source}. */
+  private languageId(): string {
+    const live = vscode.workspace.textDocuments.find((d) => d.uri.toString() === this.key);
+    return (live ?? this.document).languageId;
+  }
+
   /**
    * The file's current text.
    *
@@ -407,12 +413,6 @@ class DiagramPreview {
    * closes, and while a disposed handle still answers `getText()` with the last
    * content it knew, it will never see another edit.
    */
-  /** The file's language now — the same live-document rule as {@link source}. */
-  private languageId(): string {
-    const live = vscode.workspace.textDocuments.find((d) => d.uri.toString() === this.key);
-    return (live ?? this.document).languageId;
-  }
-
   private source(): string {
     const live = vscode.workspace.textDocuments.find((d) => d.uri.toString() === this.key);
     return (live ?? this.document).getText();
@@ -500,12 +500,13 @@ class DiagramPreview {
  * stable for a file that has not changed: nothing here is randomised, and the
  * nonce is added afterwards by {@link DiagramPreview.page}.
  */
-function diagramDocument(source: string, title: string, dark: boolean): string {
+function diagramDocument(source: string, title: string, dark: boolean, languageId?: string): string {
   // No `engines` hooks and no `sourceLines`. The host-side engines are for the
   // built-in preview, which cannot run WebAssembly; this page can, so every
   // engine runs in it exactly as it does in the apps. `sourceLines` is scroll
   // sync, which belongs to a preview that has an editor to sync with.
-  const { html, needs } = renderBody(source, { title, dark });
+  const diagram = rawDiagramKind(source, languageId) ?? undefined;
+  const { html, needs } = renderBody(source, { title, dark, diagram });
   // A PlantUML file that paints its own light fills is drawn light, on a light
   // card, even in a dark theme: the engine's dark palette writes every label in
   // white, which cannot be read on the author's pastels (`paintsOwnLightFills`).
@@ -588,16 +589,19 @@ function panelTitle(document: vscode.TextDocument): string {
  * Which container `renderBody` will emit for this text — asked here so the
  * status line can name the right engine before the page has drawn anything.
  *
- * Deliberately the same two predicates `renderBody` itself consults, in the
- * same order, rather than a look at the file extension: an `.iuml` include
- * fragment has no `@start…` line and really is not a diagram, and a `.txt` file
- * that opens `digraph {` really is one.
+ * Deliberately the rule `renderBody` itself follows (`rawDiagramKind`) rather
+ * than a look at the file extension: an `.iuml` include fragment has no
+ * `@start…` line and really is not a diagram, and a `.txt` file that opens
+ * `digraph {` really is one. Graphviz is the exception, decided by its language
+ * as well, because DOT opening with a `#` line has no marker to be read by.
  */
 function diagramKind(source: string, languageId: string): DiagramKind {
   // A Mermaid file is known by its language id alone (see mermaid-file.ts).
   if (languageId === MERMAID_LANGUAGE) return 'mermaid';
-  if (isRawPlantUML(source)) return 'plantuml';
-  if (isRawGraphviz(source)) return 'graphviz';
+  // A Graphviz file by its language too, as the exports do: DOT that opens with
+  // a `#` preprocessor line has nothing else to be recognised by.
+  const raw = rawDiagramKind(source, languageId);
+  if (raw !== null) return raw;
   return null;
 }
 
@@ -834,7 +838,8 @@ img,
    Only when the file really did produce one diagram container. A file that fell
    through to the Markdown path keeps the ordinary page above, padding and all. */
 body[data-md-diagram="plantuml"],
-body[data-md-diagram="graphviz"] {
+body[data-md-diagram="graphviz"],
+body[data-md-diagram="mermaid"] {
     margin: 0;
     padding: 0;
     min-height: 100vh;
