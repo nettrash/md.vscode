@@ -33,6 +33,7 @@ import * as vscode from 'vscode';
 
 import { frontMatter } from '../render/parser';
 import { renderDocument } from '../render/html';
+import { renderableSource } from '../render/mermaid-file';
 import { readConfig } from '../preview/config';
 import { openDiagramPreview } from '../preview/diagramPreview';
 
@@ -100,7 +101,8 @@ export function latexBytes(document: vscode.TextDocument): Uint8Array {
  * nothing to render and no dialogue worth opening.
  */
 export async function exportSvg(document: vscode.TextDocument): Promise<void> {
-  const source = document.getText();
+  // A Mermaid file is its one diagram, wrapped in a fence of its own (#5).
+  const source = renderableSource(document.getText(), document.languageId);
   const available = diagrams(source);
   if (available.length === 0) {
     void vscode.window.showInformationMessage('md: no diagrams in this document.');
