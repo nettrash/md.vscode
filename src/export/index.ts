@@ -386,6 +386,39 @@ export async function epubBytes(
   });
 }
 
+/** Redirects a cover fetch will follow before giving up. */
+const MAX_REDIRECTS = 5;
+
+/**
+ * GET `url` and every redirect after it over https only: redirects are
+ * followed by hand, so a `Location` that leaves https is refused before any
+ * request is made to it — `redirect: 'follow'` would show only the final URL,
+ * after an insecure hop had already happened. 15 seconds in all, and a body
+ * larger than the cover limit is not read. Null on any failure.
+ */
+export async function fetchHttps(url: string, fetcher: typeof fetch = fetch): Promise<Uint8Array | null> {
+  const signal = AbortSignal.timeout(15_000);
+  let current = url;
+  try {
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      if (!/^https:\/\//i.test(current)) return null;
+      const response = await fetcher(current, { signal, redirect: 'manual' });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (location === null) return null;
+        current = new URL(location, current).toString();
+        continue;
+      }
+      if (!response.ok) return null;
+      if (Number(response.headers.get('content-length') ?? '0') > MAX_COVER_BYTES) return null;
+      return new Uint8Array(await response.arrayBuffer());
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * The front matter's `cover:` image, when it can be read and is a PNG, JPEG,
  * GIF or WebP; otherwise null and the book has no cover — silently, as in every
@@ -402,16 +435,7 @@ async function readCover(document: vscode.TextDocument, value: string | null): P
     case 'local':
       return recogniseCover(await readAsset(document, reference.path));
     case 'https':
-      try {
-        const response = await fetch(reference.url, { signal: AbortSignal.timeout(15_000), redirect: 'follow' });
-        // A redirect must not leave https for plain http.
-        if (!response.ok || !response.url.startsWith('https://')) return null;
-        const length = Number(response.headers.get('content-length') ?? '0');
-        if (length > MAX_COVER_BYTES) return null;
-        return recogniseCover(new Uint8Array(await response.arrayBuffer()));
-      } catch {
-        return null;
-      }
+      return recogniseCover(await fetchHttps(reference.url));
   }
 }
 
