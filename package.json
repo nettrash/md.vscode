@@ -47,6 +47,17 @@
     "vscode": "^1.95.0"
   },
   "main": "./dist/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "md renders the document VS Code hands it and writes nothing unless you export. In Restricted Mode the two font settings are read from your user settings only, never from the workspace.",
+      "restrictedConfigurations": [
+        "md.preview.bodyFont",
+        "md.preview.codeFont"
+      ]
+    },
+    "virtualWorkspaces": true
+  },
   "contributes": {
     "markdown.markdownItPlugins": true,
     "markdown.previewScripts": [
