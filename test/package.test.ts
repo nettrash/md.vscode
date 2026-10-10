@@ -117,6 +117,10 @@ const { commands, configuration, grammars, languages, menus, submenus } = manife
 /** The diagram panel being the active editor — the zoom commands' one place. */
 const PANEL = "activeWebviewPanelId == 'md.diagramPreview'";
 
+/** The three kinds of document HTML, PDF and EPUB export, by each menu's context key. */
+const RESOURCE_DOCUMENTS = 'resourceLangId == markdown || resourceLangId == plantuml || resourceLangId == graphviz';
+const EDITOR_DOCUMENTS = 'editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz';
+
 /** One menu's rows, or a failure naming the menu rather than `undefined is not iterable`. */
 const menu = (id: string): readonly MenuItem[] => {
   const rows = menus[id];
@@ -254,9 +258,12 @@ describe('contributes.submenus — the export submenu', () => {
     ]);
   });
 
-  it('keeps PDF out of a multi-selection, and nothing else', () => {
+  it('keeps PDF out of a multi-selection and LaTeX to Markdown, and nothing else', () => {
     expect(row('md.export', 'md.exportPdf').when).toBe('!listMultiSelection');
-    for (const id of ['md.exportHtml', 'md.exportEpub', 'md.exportLatex']) {
+    // From 1.6.0 the submenu also opens on a PlantUML or Graphviz file, which
+    // LaTeX has nothing to say about (#4).
+    expect(row('md.export', 'md.exportLatex').when).toBe('resourceLangId == markdown');
+    for (const id of ['md.exportHtml', 'md.exportEpub']) {
       expect(row('md.export', id).when, id).toBeUndefined();
     }
   });
@@ -278,14 +285,14 @@ describe('contributes.menus — where the commands are offered', () => {
     }
   });
 
-  it('shows it for Markdown only, by the key each menu actually sets', () => {
+  it('shows it for Markdown, PlantUML and Graphviz, by the key each menu actually sets', () => {
     // `resourceLangId` is the file the row is about — the one clicked in the
     // explorer, the one on the tab. `editorLangId` is the editor the body
     // context menu belongs to. Using the other key in either place shows the
     // rows for every file type or for none.
-    expect(row('explorer/context', 'md.export').when).toBe('resourceLangId == markdown');
-    expect(row('editor/title/context', 'md.export').when).toBe('resourceLangId == markdown');
-    expect(row('editor/context', 'md.export').when).toBe('editorLangId == markdown');
+    expect(row('explorer/context', 'md.export').when).toBe(RESOURCE_DOCUMENTS);
+    expect(row('editor/title/context', 'md.export').when).toBe(RESOURCE_DOCUMENTS);
+    expect(row('editor/context', 'md.export').when).toBe(EDITOR_DOCUMENTS);
   });
 
   it('offers the two diagram commands for diagram files in all three', () => {
@@ -325,9 +332,9 @@ describe('contributes.menus — where the commands are offered', () => {
 
   it('still offers every command in the palette, with its own when clause', () => {
     expect(menu('commandPalette')).toEqual([
-      { command: 'md.exportHtml', when: 'editorLangId == markdown' },
-      { command: 'md.exportPdf', when: 'editorLangId == markdown' },
-      { command: 'md.exportEpub', when: 'editorLangId == markdown' },
+      { command: 'md.exportHtml', when: EDITOR_DOCUMENTS },
+      { command: 'md.exportPdf', when: EDITOR_DOCUMENTS },
+      { command: 'md.exportEpub', when: EDITOR_DOCUMENTS },
       { command: 'md.exportLatex', when: 'editorLangId == markdown' },
       {
         command: 'md.exportSvg',
