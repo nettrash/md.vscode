@@ -10,7 +10,7 @@
 //
 //    author        → <dc:creator>
 //    language      → <dc:language>, when it is a language tag; otherwise "en"
-//    date          → <dc:date>, when it is a W3C date; otherwise left out
+//    date          → <dc:date>, when it is a W3C date that exists; otherwise left out
 //    description   → <dc:description>
 //    series        → a belongs-to-collection of collection-type "series",
 //    series_index    with its group-position when the index is a number
@@ -75,8 +75,31 @@ export function fieldValue(fields: readonly MetadataField[] | null, key: string)
 
 /** A BCP 47-shaped tag, ASCII only: `en`, `ru`, `pt-BR`, `zh-Hant-TW`. */
 const LANGUAGE_TAG = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$/;
-/** W3CDTF, which is what EPUB asks of dc:date: a year, a month, a day, or a full moment with its zone. */
-const W3C_DATE = /^[0-9]{4}(?:-[0-9]{2}(?:-[0-9]{2}(?:T[0-9]{2}:[0-9]{2}(?::[0-9]{2})?(?:Z|[+-][0-9]{2}:[0-9]{2}))?)?)?$/;
+/** W3CDTF's shape, which is what EPUB asks of dc:date: a year, a month, a day, or a full moment with its zone. */
+const W3C_DATE = /^([0-9]{4})(?:-([0-9]{2})(?:-([0-9]{2})(?:T([0-9]{2}):([0-9]{2})(?::([0-9]{2}))?(?:Z|[+-]([0-9]{2}):([0-9]{2})))?)?)?$/;
+
+/**
+ * Whether `value` is a W3CDTF date that exists: the shape, and then every
+ * field in range — month 01–12, a day the month has (February 29 in a
+ * Gregorian leap year only), hour 00–23, minute and second 00–59, and a zone
+ * offset of 00–23 hours and 00–59 minutes. `2026-02-31` has the shape of a
+ * date and is not one.
+ */
+export function isW3CDate(value: string): boolean {
+  const m = W3C_DATE.exec(value);
+  if (m === null) return false;
+  const year = Number(m[1]);
+  const inRange = (field: string | undefined, low: number, high: number) =>
+    field === undefined || (Number(field) >= low && Number(field) <= high);
+  if (!inRange(m[2], 1, 12)) return false;
+  if (m[3] !== undefined) {
+    const month = Number(m[2]);
+    const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+    if (!inRange(m[3], 1, days)) return false;
+  }
+  return inRange(m[4], 0, 23) && inRange(m[5], 0, 59) && inRange(m[6], 0, 59) && inRange(m[7], 0, 23) && inRange(m[8], 0, 59);
+}
 /** A position in a series: `3`, `2.5`. */
 const SERIES_INDEX = /^[0-9]+(?:\.[0-9]+)?$/;
 
@@ -89,7 +112,7 @@ export function epubMetadata(fields: readonly MetadataField[] | null): EpubMetad
   return {
     creator: fieldValue(fields, 'author'),
     language: language !== null && LANGUAGE_TAG.test(language) ? language : 'en',
-    date: date !== null && W3C_DATE.test(date) ? date : null,
+    date: date !== null && isW3CDate(date) ? date : null,
     description: fieldValue(fields, 'description'),
     series,
     seriesIndex: series !== null && seriesIndex !== null && SERIES_INDEX.test(seriesIndex) ? seriesIndex : null,

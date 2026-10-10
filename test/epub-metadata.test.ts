@@ -22,6 +22,7 @@ import {
   epubMetadata,
   recogniseCover,
 } from '../src/export/epub-metadata';
+import { fetchHttps } from '../src/export/index';
 import { frontMatter } from '../src/render/parser';
 
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
@@ -95,6 +96,27 @@ describe('metadata lines from front matter', () => {
     }
     for (const value of ['10/10/2026', 'October 2026', '2026-10-10 09:30', '2026-10-10T09:30', '26-10-10', '２０２６']) {
       expect(epubMetadata(frontMatter(`---\ndate: ${value}\n---\n`)).date, value).toBeNull();
+    }
+  });
+
+  it('leaves out a date of the right shape that does not exist', () => {
+    for (const value of [
+      '2026-13',
+      '2026-00',
+      '2026-10-00',
+      '2026-02-29',
+      '1900-02-29',
+      '2026-04-31',
+      '2026-10-10T24:00Z',
+      '2026-10-10T23:60Z',
+      '2026-10-10T23:59:60Z',
+      '2026-10-10T10:00+24:00',
+      '2026-10-10T10:00+05:60',
+    ]) {
+      expect(epubMetadata(frontMatter(`---\ndate: ${value}\n---\n`)).date, value).toBeNull();
+    }
+    for (const value of ['2024-02-29', '2000-02-29', '2026-12-31T23:59:59-11:30', '2026-01-31', '2026-10-10T00:00+00:00']) {
+      expect(epubMetadata(frontMatter(`---\ndate: ${value}\n---\n`)).date, value).toBe(value);
     }
   });
 
@@ -225,5 +247,58 @@ describe('the package document', () => {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('fetching an https cover', () => {
+  type Reply = { status: number; location?: string; length?: number; body?: Uint8Array };
+  function fake(replies: Record<string, Reply>) {
+    const asked: string[] = [];
+    const fetcher = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      asked.push(url);
+      expect(init?.redirect).toBe('manual');
+      const reply = replies[url] ?? { status: 404 };
+      const headers = new Headers();
+      if (reply.location !== undefined) headers.set('location', reply.location);
+      if (reply.length !== undefined) headers.set('content-length', String(reply.length));
+      return new Response(reply.status >= 300 && reply.status < 400 ? null : (reply.body ?? new Uint8Array()), {
+        status: reply.status,
+        headers,
+      });
+    }) as typeof fetch;
+    return { fetcher, asked };
+  }
+
+  it('reads the image, following an https redirect, relative or absolute', async () => {
+    const { fetcher, asked } = fake({
+      'https://a.example/cover': { status: 302, location: '/img/c.png' },
+      'https://a.example/img/c.png': { status: 301, location: 'https://cdn.example/c.png' },
+      'https://cdn.example/c.png': { status: 200, body: PNG },
+    });
+    expect([...((await fetchHttps('https://a.example/cover', fetcher)) ?? [])]).toEqual([...PNG]);
+    expect(asked).toEqual(['https://a.example/cover', 'https://a.example/img/c.png', 'https://cdn.example/c.png']);
+  });
+
+  it('refuses a redirect that leaves https before making any request to it', async () => {
+    const { fetcher, asked } = fake({
+      'https://a.example/cover': { status: 302, location: 'http://a.example/cover' },
+      'http://a.example/cover': { status: 302, location: 'https://a.example/final.png' },
+      'https://a.example/final.png': { status: 200, body: PNG },
+    });
+    expect(await fetchHttps('https://a.example/cover', fetcher)).toBeNull();
+    expect(asked).toEqual(['https://a.example/cover']);
+  });
+
+  it('gives up after five redirects, on an error status, and on a declared oversized body', async () => {
+    const loop: Record<string, Reply> = {};
+    for (let i = 0; i < 7; i++) loop[`https://a.example/${i}`] = { status: 302, location: `https://a.example/${i + 1}` };
+    const looping = fake(loop);
+    expect(await fetchHttps('https://a.example/0', looping.fetcher)).toBeNull();
+    expect(looping.asked).toHaveLength(6);
+    expect(await fetchHttps('https://a.example/missing', fake({}).fetcher)).toBeNull();
+    const big = fake({ 'https://a.example/big.png': { status: 200, length: MAX_COVER_BYTES + 1, body: PNG } });
+    expect(await fetchHttps('https://a.example/big.png', big.fetcher)).toBeNull();
+    expect(await fetchHttps('http://a.example/c.png', fake({}).fetcher)).toBeNull();
   });
 });
