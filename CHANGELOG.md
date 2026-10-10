@@ -23,6 +23,16 @@ it.
 
 ## [1.6.0] — 2026-10-10
 
+### Added
+
+- **md works in Restricted Mode and in virtual workspaces.** A folder you
+  have not trusted, or a repository opened through GitHub Repositories,
+  used to get the plain built-in preview and a "some extensions are
+  disabled" banner, because md declared no support for either. It now
+  declares both: it runs nothing the folder supplies and writes nothing
+  unless you export. In Restricted Mode `md.preview.bodyFont` and
+  `md.preview.codeFont` are read from your user settings only. (#1)
+
 ## [1.5.3] — 2026-10-09
 
 ### Added
