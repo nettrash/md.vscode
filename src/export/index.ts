@@ -32,7 +32,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 
 import { frontMatter } from '../render/parser';
-import { renderDocument, type RawDiagram } from '../render/html';
+import { rawDiagramKind, renderDocument, type RawDiagram } from '../render/html';
 import { readConfig } from '../preview/config';
 import { openDiagramPreview } from '../preview/diagramPreview';
 
@@ -136,13 +136,14 @@ export async function exportSvg(document: vscode.TextDocument): Promise<void> {
 }
 
 /**
- * The bare diagram a document is by its language — a `.puml` or `.gv` file the
- * editor opened as PlantUML or Graphviz — so it is drawn as one even when its
- * text alone would not say so (a DOT file that opens with a `#` line).
- * Undefined for Markdown, which is sniffed as before.
+ * The bare diagram a document is by its language: a `.gv` file the editor
+ * opened as Graphviz is drawn as one even when its text alone would not say so
+ * (a DOT file that opens with a `#` line). Everything else — PlantUML, whose
+ * `.iuml` fragments are not diagrams, and Markdown — is read from the text, as
+ * before. See `rawDiagramKind`.
  */
 function knownDiagram(document: vscode.TextDocument): RawDiagram | undefined {
-  return document.languageId === 'plantuml' || document.languageId === 'graphviz' ? document.languageId : undefined;
+  return rawDiagramKind('', document.languageId) ?? undefined;
 }
 
 // MARK: - HTML  (ship order 3 — capture plus KaTeX inlining)
