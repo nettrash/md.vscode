@@ -12,7 +12,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { countCharacters, countLabel, countWords, readingMinutes } from '../src/status/count';
+import { countCharacters, countLabel, countWords, readingMinutes, selectionCount } from '../src/status/count';
 
 const example = (name: string): string =>
   readFileSync(path.join(__dirname, 'fixtures', 'examples', name), 'utf8');
@@ -53,5 +53,19 @@ describe('countLabel', () => {
     expect(readingMinutes(0)).toBe(1);
     expect(readingMinutes(211)).toBe(1);
     expect(readingMinutes(2300)).toBe(10);
+  });
+});
+
+describe('selectionCount', () => {
+  it('adds each selection on its own, with nothing between them counted', () => {
+    // Two one-character selections are two characters, not "a\nb"'s three.
+    expect(selectionCount(['a', 'b'])).toEqual({ words: 2, characters: 2 });
+    expect(selectionCount(['hello world', 'again'])).toEqual({ words: 3, characters: 16 });
+  });
+
+  it('is undefined for carets only, and an empty caret adds nothing', () => {
+    expect(selectionCount(['', ''])).toBeUndefined();
+    expect(selectionCount([])).toBeUndefined();
+    expect(selectionCount(['', 'word', ''])).toEqual({ words: 1, characters: 4 });
   });
 });

@@ -21,7 +21,7 @@
 
 import type { Block } from '../render/types';
 import { parse } from '../render/parser';
-import { graphvizEngines, isRawGraphviz, isRawPlantUML } from '../render/html';
+import { graphvizEngines, rawDiagramKind, type RawDiagram } from '../render/html';
 import { trimWS } from '../render/text';
 
 export type DiagramKind = 'mermaid' | 'plantuml' | 'graphviz' | 'plot';
@@ -92,11 +92,12 @@ export function menuTitle(diagram: Diagram): string {
  * Math fences and every other code block are skipped: a formula is not SVG, and
  * ordinary code is not a diagram.
  */
-export function diagrams(source: string): Diagram[] {
-  if (isRawPlantUML(source)) {
+export function diagrams(source: string, diagram?: RawDiagram): Diagram[] {
+  const raw = diagram ?? rawDiagramKind(source);
+  if (raw === 'plantuml') {
     return [{ ordinal: 0, kind: 'plantuml', engine: null, label: firstLine(source) }];
   }
-  if (isRawGraphviz(source)) {
+  if (raw === 'graphviz') {
     return [{ ordinal: 0, kind: 'graphviz', engine: 'dot', label: firstLine(source) }];
   }
   const out: Diagram[] = [];
