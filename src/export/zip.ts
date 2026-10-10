@@ -93,6 +93,8 @@ const DOS_TIME = 0x0000;
 
 /** Method codes. 0 is STORED, 8 is raw DEFLATE (RFC 1951, no zlib wrapper). */
 const METHOD_STORED = 0;
+/** General-purpose bit 11: the entry's name is UTF-8 (APPNOTE 4.4.4). */
+const UTF8_NAME_FLAG = 0x0800;
 const METHOD_DEFLATE = 8;
 
 /**
@@ -108,11 +110,15 @@ export function archive(entries: readonly ZipEntry[]): Uint8Array {
   let offset = 0;
 
   for (const entry of entries) {
-    // The name is UTF-8 with no flag bit set. Everything the EPUB packer names
-    // is ASCII (`OEBPS/u001.xhtml`, `images/content-01.png`), so bit 11 — the
-    // "language encoding" flag — is deliberately left clear: setting it would
-    // be a byte difference from the apps for names that cannot need it.
+    // The name is UTF-8. Bit 11 — the "language encoding" flag — says so, and
+    // is set only when the name needs it: everything the EPUB packer names is
+    // ASCII (`OEBPS/u001.xhtml`, `images/content-01.png`) and keeps the clear
+    // flag, and the bytes, the apps write. A TextPack's names are the user's —
+    // `Заметки.textbundle/assets/фото.png` — and without the flag a reader
+    // that follows the specification decodes them as CP437, so `text.md`'s
+    // `assets/фото.png` no longer finds its file.
     const name = Buffer.from(entry.name, 'utf8');
+    const flags = /^[\x00-\x7f]*$/.test(entry.name) ? 0 : UTF8_NAME_FLAG;
     const uncompressed = Buffer.from(
       entry.data.buffer,
       entry.data.byteOffset,
@@ -130,7 +136,7 @@ export function archive(entries: readonly ZipEntry[]): Uint8Array {
     const local = Buffer.alloc(30);
     local.writeUInt32LE(0x04034b50, 0); // local file header signature
     local.writeUInt16LE(20, 4); // version needed to extract (2.0)
-    local.writeUInt16LE(0, 6); // general purpose flags
+    local.writeUInt16LE(flags, 6); // general purpose flags
     local.writeUInt16LE(method, 8);
     local.writeUInt16LE(DOS_TIME, 10);
     local.writeUInt16LE(DOS_DATE, 12);
@@ -145,7 +151,7 @@ export function archive(entries: readonly ZipEntry[]): Uint8Array {
     central.writeUInt32LE(0x02014b50, 0); // central directory signature
     central.writeUInt16LE(20, 4); // version made by
     central.writeUInt16LE(20, 6); // version needed to extract
-    central.writeUInt16LE(0, 8); // flags
+    central.writeUInt16LE(flags, 8); // flags
     central.writeUInt16LE(method, 10);
     central.writeUInt16LE(DOS_TIME, 12);
     central.writeUInt16LE(DOS_DATE, 14);

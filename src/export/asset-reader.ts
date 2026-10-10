@@ -15,16 +15,28 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+/**
+ * Whether `candidate` lies strictly inside `folder` — by `relative`, not by a
+ * string prefix, so a document at a file-system root (`/notes.md`, `C:\\x.md`)
+ * finds its neighbours, and a sibling named `..cover.png` is not mistaken for
+ * a climb. `paths` is the platform's path module; a test passes the other one.
+ */
+export function isInside(folder: string, candidate: string, paths: typeof path = path): boolean {
+  const relative = paths.relative(folder, candidate);
+  if (relative === '' || paths.isAbsolute(relative)) return false;
+  return relative.split(paths.sep)[0] !== '..';
+}
+
 /** The bytes of `relativePath` beside `documentPath`, or null when it is missing, a folder, or outside. */
 export async function readLocalAsset(relativePath: string, documentPath: string | null): Promise<Uint8Array | null> {
   if (documentPath === null || path.isAbsolute(relativePath)) return null;
   const folder = path.dirname(documentPath);
   const candidate = path.resolve(folder, relativePath);
-  if (!candidate.startsWith(folder + path.sep)) return null;
+  if (!isInside(folder, candidate)) return null;
   try {
     const realFolder = await fs.promises.realpath(folder);
     const realCandidate = await fs.promises.realpath(candidate);
-    if (!realCandidate.startsWith(realFolder + path.sep)) return null;
+    if (!isInside(realFolder, realCandidate)) return null;
     if (!(await fs.promises.stat(realCandidate)).isFile()) return null;
     return new Uint8Array(await fs.promises.readFile(realCandidate));
   } catch {

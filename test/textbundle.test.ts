@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { readLocalAsset } from '../src/export/asset-reader';
+import { isInside, readLocalAsset } from '../src/export/asset-reader';
 import {
   INFO_JSON,
   bundleFiles,
@@ -242,5 +242,54 @@ describe('readLocalAsset — containment', () => {
     expect(await readLocalAsset('link.png', document)).toBeNull();
     expect(await readLocalAsset('imgs/secret.png', document)).toBeNull();
     expect([...((await readLocalAsset('same.png', document)) ?? [])]).toEqual([0x52]);
+  });
+});
+
+describe('isInside — containment by relative path', () => {
+  it('finds a neighbour of a document at a file-system root', () => {
+    expect(isInside('/', '/photo.png', path.posix)).toBe(true);
+    expect(isInside('C:\\', 'C:\\photo.png', path.win32)).toBe(true);
+    expect(isInside('/docs', '/docs/a/b.png', path.posix)).toBe(true);
+  });
+
+  it('refuses the folder itself, a climb, a sibling folder and another drive', () => {
+    expect(isInside('/docs', '/docs', path.posix)).toBe(false);
+    expect(isInside('/docs', '/outside.png', path.posix)).toBe(false);
+    expect(isInside('/docs', '/docs-2/a.png', path.posix)).toBe(false);
+    expect(isInside('C:\\docs', 'D:\\docs\\a.png', path.win32)).toBe(false);
+  });
+
+  it('does not mistake a name that starts with two dots for a climb', () => {
+    expect(isInside('/docs', '/docs/..cover.png', path.posix)).toBe(true);
+  });
+});
+
+describe('the zip writer’s UTF-8 name flag', () => {
+  const flagsOf = (zip: Uint8Array) => {
+    const view = Buffer.from(zip);
+    const local = view.readUInt16LE(6);
+    const at = view.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
+    return { local, central: view.readUInt16LE(at + 8) };
+  };
+
+  it('stays clear for ASCII names, so every EPUB keeps its bytes', () => {
+    expect(flagsOf(archive([{ name: 'OEBPS/content.opf', data: utf8('x') }]))).toEqual({ local: 0, central: 0 });
+  });
+
+  it('is set for a non-ASCII name, and a reader then finds the file by it', () => {
+    const pack = archive(packEntries('Заметки', { text: '![](assets/фото.png)', assets: [{ name: 'фото.png', data: new Uint8Array([1]) }] }));
+    expect(flagsOf(pack)).toEqual({ local: 0x0800, central: 0x0800 });
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-textpack-utf8-'));
+    try {
+      const file = path.join(dir, 'p.textpack');
+      fs.writeFileSync(file, pack);
+      // Python's zipfile follows the specification — UTF-8 when bit 11 is set,
+      // CP437 otherwise — where macOS's bundled unzip mangles the name either way.
+      const script = 'import sys, zipfile; print("\\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))';
+      const listing = execFileSync('python3', ['-I', '-c', script, file], { encoding: 'utf8' }).trim().split('\n');
+      expect(listing).toEqual(['Заметки.textbundle/info.json', 'Заметки.textbundle/text.md', 'Заметки.textbundle/assets/фото.png']);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
