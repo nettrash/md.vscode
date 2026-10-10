@@ -69,9 +69,10 @@ you at any time. They are, in full: which palette the preview draws in
 `md.preview.codeFont`), whether each engine is enabled
 (`md.math.enabled`, `md.diagrams.mermaid`, `md.diagrams.graphviz`,
 `md.diagrams.plantuml`, `md.diagrams.plot`, `md.highlight.enabled`), the
-page size used for PDF export (`md.export.pageSize`) and whether the
+page size used for PDF export (`md.export.pageSize`), whether the
 Markdown-dialect lint runs and which of its rules (`md.lint.dialect`,
-`md.lint.rules`). Beyond those the extension stores nothing at all: no
+`md.lint.rules`), and whether the status bar shows the word count
+(`md.statusBar.wordCount`). Beyond those the extension stores nothing at all: no
 database, no cache, no recent-documents list, and nothing in VS Code's
 global or workspace state. None of it leaves your machine, and none of it
 contains personal information. If a future version remembers anything
