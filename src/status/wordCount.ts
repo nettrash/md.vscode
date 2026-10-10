@@ -11,7 +11,7 @@
 
 import * as vscode from 'vscode';
 
-import { countCharacters, countLabel, countWords, readingMinutes } from './count';
+import { countCharacters, countLabel, countWords, readingMinutes, selectionCount } from './count';
 
 const DEBOUNCE_MS = 250;
 
@@ -20,10 +20,17 @@ export function registerWordCount(context: vscode.ExtensionContext): void {
   item.name = 'md: Word Count';
   let timer: ReturnType<typeof setTimeout> | undefined;
   // The document's own count, kept between selection changes: moving the caret
-  // must not re-segment the whole file.
-  let cached: { uri: string; version: number; words: number; characters: number } | undefined;
+  // must not re-segment the whole file. Keyed on the document object, not its
+  // URI: a version number starts again when a file is closed and reopened, so a
+  // file changed on disk in between could otherwise come back at a version
+  // that matches the stale count.
+  let cached: { document: vscode.TextDocument; version: number; words: number; characters: number } | undefined;
 
   const update = (): void => {
+    // Called directly on an editor or setting change as well as by the
+    // debounce: a pending count is cancelled, not merely forgotten, or it
+    // would fire later and clear the handle of the next one.
+    if (timer !== undefined) clearTimeout(timer);
     timer = undefined;
     const editor = vscode.window.activeTextEditor;
     const enabled = vscode.workspace
@@ -34,12 +41,11 @@ export function registerWordCount(context: vscode.ExtensionContext): void {
       return;
     }
     const document = editor.document;
-    if (cached?.uri !== document.uri.toString() || cached.version !== document.version) {
+    if (cached?.document !== document || cached.version !== document.version) {
       const text = document.getText();
-      cached = { uri: document.uri.toString(), version: document.version, words: countWords(text), characters: countCharacters(text) };
+      cached = { document, version: document.version, words: countWords(text), characters: countCharacters(text) };
     }
-    const selected = editor.selections.map((s) => document.getText(s)).join('\n');
-    const selection = selected.length > 0 ? { words: countWords(selected), characters: countCharacters(selected) } : undefined;
+    const selection = selectionCount(editor.selections.map((s) => document.getText(s)));
     item.text = countLabel(cached, selection);
     const minutes = readingMinutes(cached.words);
     item.tooltip = `md: about ${minutes} minute${minutes === 1 ? '' : 's'} to read. Words and characters are counted as the md apps count them.`;
