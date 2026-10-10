@@ -304,6 +304,7 @@ workspace or for one folder.
 | `md.diagrams.plot` | `true` | Draw ` ```plot ` blocks as charts |
 | `md.highlight.enabled` | `true` | Syntax-highlight fenced code blocks that name a language |
 | `md.export.pageSize` | `A4` | Page size for PDF export: `A4`, `A5`, `Letter`, `Legal`, `6x9`, `5x8`, `5.5x8.5` |
+| `md.statusBar.wordCount` | `true` | The document's words and characters in the status bar while a Markdown editor is active, counted as the md apps count them; the selection's too when there is one |
 | `md.lint.dialect` | `true` | Point out, at Information level, where md's Markdown differs from GitHub's |
 | `md.lint.rules` | *(all on)* | Which of the five differences are reported: `rawHtml`, `referenceLink`, `indentedCode`, `tableAfterParagraph`, `footnote` |
 

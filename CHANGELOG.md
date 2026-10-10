@@ -32,6 +32,13 @@ it.
   declares both: it runs nothing the folder supplies and writes nothing
   unless you export. In Restricted Mode `md.preview.bodyFont` and
   `md.preview.codeFont` are read from your user settings only. (#1)
+- **Words and characters in the status bar.** "211 words · 1,425
+  characters" while a Markdown editor is active — the footer every md app
+  carries, counted the same way (ICU word segments, user-perceived
+  characters), and checked against md for iPhone on the bundled examples.
+  With a selection it reads "12 of 211 words · 70 of 1,425 characters";
+  its tooltip gives a reading time. `md.statusBar.wordCount` turns it off.
+  (#2)
 
 ## [1.5.3] — 2026-10-09
 
