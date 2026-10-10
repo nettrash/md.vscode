@@ -46,6 +46,7 @@ import {
 } from './textbundle';
 import { archive } from './zip';
 import { readLocalAsset } from './asset-reader';
+import { coverReference, epubMetadata, fieldValue, MAX_COVER_BYTES, recogniseCover, type EpubCover } from './epub-metadata';
 import { readConfig } from '../preview/config';
 import { openDiagramPreview } from '../preview/diagramPreview';
 
@@ -345,13 +346,45 @@ export async function epubBytes(
     body = applyImageReplacements(body, ranges, replacements);
   }
 
+  const fields = frontMatter(source);
   return packDocumentEpub({
     title,
     body: xhtml(body),
     images,
     outline: epubOutline(source),
     modified: modifiedNow(),
+    metadata: epubMetadata(fields),
+    cover: await readCover(document, fieldValue(fields, 'cover')),
   });
+}
+
+/**
+ * The front matter's `cover:` image, when it can be read and is a PNG, JPEG,
+ * GIF or WebP; otherwise null and the book has no cover — silently, as in every
+ * md app. A `data:` image is decoded, an `https:` one fetched (15 seconds, 20
+ * MB at most), and a relative path read from beside the document with the
+ * TextBundle export's containment.
+ */
+async function readCover(document: vscode.TextDocument, value: string | null): Promise<EpubCover | null> {
+  const reference = coverReference(value);
+  if (reference === null) return null;
+  switch (reference.kind) {
+    case 'data':
+      return recogniseCover(reference.data);
+    case 'local':
+      return recogniseCover(await readAsset(document, reference.path));
+    case 'https':
+      try {
+        const response = await fetch(reference.url, { signal: AbortSignal.timeout(15_000), redirect: 'follow' });
+        // A redirect must not leave https for plain http.
+        if (!response.ok || !response.url.startsWith('https://')) return null;
+        const length = Number(response.headers.get('content-length') ?? '0');
+        if (length > MAX_COVER_BYTES) return null;
+        return recogniseCover(new Uint8Array(await response.arrayBuffer()));
+      } catch {
+        return null;
+      }
+  }
 }
 
 // MARK: - PDF  (ship order 5 — documented non-parity)

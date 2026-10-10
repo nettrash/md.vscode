@@ -32,6 +32,7 @@ import { outline } from '../render/parser';
 import { trimWSNL } from '../render/text';
 import { archive, assertEpubOrder, EPUB_MIMETYPE, type ZipEntry } from './zip';
 import { createHash } from 'node:crypto';
+import { coverHref, DEFAULT_METADATA, type EpubCover, type EpubMetadata } from './epub-metadata';
 
 // MARK: - The book model
 
@@ -164,13 +165,43 @@ export function documentTitle(frontMatter: readonly MetadataField[] | null, file
 }
 
 /**
+ * The metadata lines the front matter adds, between `dc:title` and
+ * `dcterms:modified` — identical text in all five md EPUB writers (see
+ * `epub-metadata.ts` for the keys and their rules). With no front matter this
+ * is exactly the one `<dc:language>en</dc:language>` line every md EPUB has
+ * always carried.
+ */
+export function metadataLines(metadata: EpubMetadata, cover: EpubCover | null): string[] {
+  const lines: string[] = [];
+  if (metadata.creator !== null) lines.push(`<dc:creator>${escapeXML(metadata.creator)}</dc:creator>`);
+  lines.push(`<dc:language>${escapeXML(metadata.language)}</dc:language>`);
+  if (metadata.date !== null) lines.push(`<dc:date>${escapeXML(metadata.date)}</dc:date>`);
+  if (metadata.description !== null) lines.push(`<dc:description>${escapeXML(metadata.description)}</dc:description>`);
+  if (metadata.series !== null) {
+    lines.push(`<meta property="belongs-to-collection" id="series">${escapeXML(metadata.series)}</meta>`);
+    lines.push('<meta refines="#series" property="collection-type">series</meta>');
+    if (metadata.seriesIndex !== null) {
+      lines.push(`<meta refines="#series" property="group-position">${escapeXML(metadata.seriesIndex)}</meta>`);
+    }
+  }
+  // EPUB 3 finds the cover by the manifest property; this EPUB 2 meta is for the
+  // readers — Kindle's converter among them — that still look for it.
+  if (cover !== null) lines.push('<meta name="cover" content="cover-image"/>');
+  return lines;
+}
+
+/** The cover's manifest item, the last item of every md EPUB that has one. */
+export function coverItem(cover: EpubCover): string {
+  return `<item id="cover-image" href="${coverHref(cover)}" media-type="${cover.mediaType}" properties="cover-image"/>`;
+}
+
+/**
  * The package document: metadata, manifest (nav + stylesheet + every unit and
- * image), and the spine in reading order.
+ * image, then the cover), and the spine in reading order.
  *
- * `dc:language` is hard-coded `en` — the app is English-only, and that is a
- * product fact rather than an oversight. `modified` is **not** escaped: it is
- * an ISO-8601 string by construction, and escaping it would be the kind of
- * defensive edit that quietly changes bytes.
+ * `dc:language` is the front matter's `language:` tag, else `en`. `modified`
+ * is **not** escaped: it is an ISO-8601 string by construction, and escaping
+ * it would be the kind of defensive edit that quietly changes bytes.
  */
 export function contentOPF(args: {
   title: string;
@@ -178,7 +209,10 @@ export function contentOPF(args: {
   modified: string;
   units: readonly { id: string; href: string; svg?: boolean }[];
   images: readonly string[];
+  metadata?: EpubMetadata;
+  cover?: EpubCover | null;
 }): string {
+  const cover = args.cover ?? null;
   const manifest = [
     // `properties="svg"` is required — OPF-014 — of every content document that
     // contains an `<svg>` element, and EPUBCheck errors without it. Until the
@@ -192,6 +226,7 @@ export function contentOPF(args: {
     ...args.images.map(
       (href, index) => `<item id="img${index + 1}" href="${href}" media-type="image/png"/>`,
     ),
+    ...(cover === null ? [] : [coverItem(cover)]),
   ];
   const spine = args.units.map((unit) => `<itemref idref="${unit.id}"/>`);
   return [
@@ -200,7 +235,7 @@ export function contentOPF(args: {
     '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">',
     `<dc:identifier id="book-id">${escapeXML(args.identifier)}</dc:identifier>`,
     `<dc:title>${escapeXML(args.title)}</dc:title>`,
-    '<dc:language>en</dc:language>',
+    ...metadataLines(args.metadata ?? DEFAULT_METADATA, cover),
     `<meta property="dcterms:modified">${args.modified}</meta>`,
     '</metadata>',
     '<manifest>',
@@ -514,6 +549,8 @@ export function documentEpubEntries(args: {
   images: readonly EpubImage[];
   outline: readonly OutlineEntry[];
   modified: string;
+  metadata?: EpubMetadata;
+  cover?: EpubCover | null;
 }): ZipEntry[] {
   const contentHref = 'content.xhtml';
   const opf = contentOPF({
@@ -525,6 +562,8 @@ export function documentEpubEntries(args: {
     // today that means a ```plot fence.
     units: [{ id: 'content', href: contentHref, svg: args.body.includes('<svg') }],
     images: args.images.map((image) => image.href),
+    metadata: args.metadata,
+    cover: args.cover,
   });
 
   // The document's outline as the nav TOC: a flat list of heading links, the
@@ -557,6 +596,7 @@ export function documentEpubEntries(args: {
   for (const image of args.images) {
     entries.push({ name: `OEBPS/${image.href}`, data: image.data });
   }
+  if (args.cover) entries.push({ name: `OEBPS/${coverHref(args.cover)}`, data: args.cover.data });
   return entries;
 }
 
@@ -572,6 +612,8 @@ export function packDocumentEpub(args: {
   images: readonly EpubImage[];
   outline: readonly OutlineEntry[];
   modified: string;
+  metadata?: EpubMetadata;
+  cover?: EpubCover | null;
 }): Uint8Array {
   const entries = documentEpubEntries(args);
   assertEpubOrder(entries);

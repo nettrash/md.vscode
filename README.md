@@ -161,7 +161,7 @@ code).
   highlight.js 11.11.1 — and nothing is fetched, phoned home or checked
   for. The one thing that can still reach the network is an image **your
   own document names** by URL, which the preview loads exactly as a
-  browser would.
+  browser would, or that an EPUB's front matter names as its `cover:`.
 - **Typewriter feel.** The apps' paper palette — light "fresh paper",
   dark "carbon paper" — following the editor's own light or dark theme,
   American Typewriter where the system has it and Georgia where it does
