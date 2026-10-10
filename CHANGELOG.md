@@ -39,6 +39,11 @@ it.
   With a selection it reads "12 of 211 words · 70 of 1,425 characters";
   its tooltip gives a reading time. `md.statusBar.wordCount` turns it off.
   (#2)
+- **Go to Heading… and Go to Note….** The apps' Contents and Notes menus,
+  as two QuickPicks: md's own outline — so a heading md does not draw is
+  not offered — and every private author note (`<!-- note: … -->`) with
+  its line. The editor follows the highlighted row and Escape puts it back,
+  as in Go to Symbol. Nothing in VS Code listed the notes before. (#3)
 
 ## [1.5.3] — 2026-10-09
 
