@@ -31,7 +31,7 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 
-import { frontMatter, outline } from '../render/parser';
+import { frontMatter } from '../render/parser';
 import { renderDocument } from '../render/html';
 import { readConfig } from '../preview/config';
 import { openDiagramPreview } from '../preview/diagramPreview';
@@ -48,6 +48,7 @@ import {
   richElementRanges,
   xhtml,
   type EpubImage,
+  epubOutline,
 } from './epub';
 import { exportDocumentHTML, selfContainedHTML as finishSelfContainedHTML } from './html';
 import { latexDocument } from './latex';
@@ -223,7 +224,7 @@ export async function epubBytes(
     title,
     body: xhtml(body),
     images,
-    outline: outline(source),
+    outline: epubOutline(source),
     modified: modifiedNow(),
   });
 }

@@ -27,7 +27,8 @@
 //
 
 import type { MetadataField, OutlineEntry } from '../render/types';
-import { renderDocument } from '../render/html';
+import { isRawGraphviz, isRawPlantUML, renderDocument } from '../render/html';
+import { outline } from '../render/parser';
 import { trimWSNL } from '../render/text';
 import { archive, assertEpubOrder, EPUB_MIMETYPE, type ZipEntry } from './zip';
 import { createHash } from 'node:crypto';
@@ -480,6 +481,17 @@ export function imageHref(unitID: string, ordinal: number): string {
 }
 
 // MARK: - The single-document package
+
+/**
+ * The headings a document EPUB lists in its contents. A bare PlantUML or
+ * Graphviz file has none — and a Graphviz file's `# …` lines, preprocessor
+ * lines to DOT, would read as headings to `outline` and send the contents to
+ * anchors that do not exist — so a diagram file gets the single whole-document
+ * entry a headingless Markdown file gets.
+ */
+export function epubOutline(source: string): OutlineEntry[] {
+  return isRawPlantUML(source) || isRawGraphviz(source) ? [] : outline(source);
+}
 
 /**
  * The EPUB package entries for a single document, `mimetype` first: container,
