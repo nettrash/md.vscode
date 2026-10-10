@@ -14,7 +14,7 @@ import * as vscode from 'vscode';
 import { notes, outline } from '../render/parser';
 import { headingRows, noteRows, type GoToRow } from './items';
 
-type Row = vscode.QuickPickItem & { line: number };
+export type Row = vscode.QuickPickItem & { line: number };
 
 async function goTo(kind: 'heading' | 'note'): Promise<void> {
   const editor = vscode.window.activeTextEditor;
@@ -32,10 +32,45 @@ async function goTo(kind: 'heading' | 'note'): Promise<void> {
   }
 
   const pick = vscode.window.createQuickPick<Row>();
+  bindGoTo(editor, pick, rows, kind === 'heading' ? 'Go to a heading' : 'Go to a note');
+  pick.show();
+}
+
+/** As much of a `TextEditor` as the picker drives. */
+export interface GoToEditor {
+  readonly document: vscode.TextDocument;
+  readonly viewColumn: vscode.ViewColumn | undefined;
+  selections: readonly vscode.Selection[];
+  readonly visibleRanges: readonly vscode.Range[];
+  revealRange(range: vscode.Range, type?: vscode.TextEditorRevealType): void;
+}
+
+/** As much of a `QuickPick` as the behaviour needs. */
+export interface GoToPicker {
+  items: readonly Row[];
+  placeholder: string | undefined;
+  matchOnDescription: boolean;
+  readonly selectedItems: readonly Row[];
+  readonly activeItems: readonly Row[];
+  onDidChangeActive(listener: (active: readonly Row[]) => unknown): unknown;
+  onDidAccept(listener: () => unknown): unknown;
+  onDidHide(listener: () => unknown): unknown;
+  hide(): void;
+  dispose(): void;
+}
+
+/**
+ * The picker's behaviour, Go to Symbol's: the editor follows the highlighted
+ * row; Enter puts the caret at the start of the row's line; Escape (any hide
+ * without Enter) gives back every selection the editor had — all its cursors,
+ * not only the primary — and the scroll position. Separate from `goTo` so a
+ * test can drive it with a fake editor and picker.
+ */
+export function bindGoTo(editor: GoToEditor, pick: GoToPicker, rows: readonly GoToRow[], placeholder: string): void {
   pick.items = rows.map((r) => ({ label: r.label, description: r.description, line: r.line }));
-  pick.placeholder = kind === 'heading' ? 'Go to a heading' : 'Go to a note';
+  pick.placeholder = placeholder;
   pick.matchOnDescription = false;
-  const restore = { selection: editor.selection, range: editor.visibleRanges[0] };
+  const restore = { selections: editor.selections, range: editor.visibleRanges[0] };
   const reveal = (line: number): void =>
     editor.revealRange(new vscode.Range(line, 0, line, 0), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
 
@@ -48,21 +83,20 @@ async function goTo(kind: 'heading' | 'note'): Promise<void> {
     if (row !== undefined) {
       accepted = true;
       const position = new vscode.Position(row.line, 0);
-      editor.selection = new vscode.Selection(position, position);
+      editor.selections = [new vscode.Selection(position, position)];
       reveal(row.line);
     }
     pick.hide();
   });
   pick.onDidHide(() => {
     if (!accepted) {
-      editor.selection = restore.selection;
+      editor.selections = restore.selections;
       if (restore.range !== undefined) editor.revealRange(restore.range, vscode.TextEditorRevealType.AtTop);
     } else {
       void vscode.window.showTextDocument(editor.document, editor.viewColumn);
     }
     pick.dispose();
   });
-  pick.show();
 }
 
 export function registerGoTo(context: vscode.ExtensionContext): void {
