@@ -101,6 +101,18 @@
           ".dot"
         ],
         "configuration": "./language/graphviz.language-configuration.json"
+      },
+      {
+        "id": "mermaid",
+        "aliases": [
+          "Mermaid",
+          "mermaid"
+        ],
+        "extensions": [
+          ".mmd",
+          ".mermaid"
+        ],
+        "configuration": "./language/mermaid.language-configuration.json"
       }
     ],
     "grammars": [
@@ -223,12 +235,12 @@
         },
         {
           "command": "md.exportSvg",
-          "when": "(resourceLangId == plantuml || resourceLangId == graphviz) && !listMultiSelection",
+          "when": "(resourceLangId == plantuml || resourceLangId == graphviz || resourceLangId == mermaid) && !listMultiSelection",
           "group": "md@2"
         },
         {
           "command": "md.showDiagramPreview",
-          "when": "(resourceLangId == plantuml || resourceLangId == graphviz) && !listMultiSelection",
+          "when": "(resourceLangId == plantuml || resourceLangId == graphviz || resourceLangId == mermaid) && !listMultiSelection",
           "group": "md@3"
         }
       ],
@@ -240,12 +252,12 @@
         },
         {
           "command": "md.exportSvg",
-          "when": "editorLangId == plantuml || editorLangId == graphviz",
+          "when": "editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid",
           "group": "md@2"
         },
         {
           "command": "md.showDiagramPreview",
-          "when": "editorLangId == plantuml || editorLangId == graphviz",
+          "when": "editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid",
           "group": "md@3"
         }
       ],
@@ -257,12 +269,12 @@
         },
         {
           "command": "md.exportSvg",
-          "when": "resourceLangId == plantuml || resourceLangId == graphviz",
+          "when": "resourceLangId == plantuml || resourceLangId == graphviz || resourceLangId == mermaid",
           "group": "md@2"
         },
         {
           "command": "md.showDiagramPreview",
-          "when": "resourceLangId == plantuml || resourceLangId == graphviz",
+          "when": "resourceLangId == plantuml || resourceLangId == graphviz || resourceLangId == mermaid",
           "group": "md@3"
         }
       ],
@@ -285,11 +297,11 @@
         },
         {
           "command": "md.exportSvg",
-          "when": "editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz"
+          "when": "editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid"
         },
         {
           "command": "md.showDiagramPreview",
-          "when": "editorLangId == plantuml || editorLangId == graphviz"
+          "when": "editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid"
         },
         {
           "command": "md.goToHeading",
@@ -315,7 +327,7 @@
       "editor/title": [
         {
           "command": "md.showDiagramPreview",
-          "when": "editorLangId == plantuml || editorLangId == graphviz",
+          "when": "editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid",
           "group": "navigation"
         },
         {
@@ -511,7 +523,8 @@
   "activationEvents": [
     "onLanguage:markdown",
     "onLanguage:plantuml",
-    "onLanguage:graphviz"
+    "onLanguage:graphviz",
+    "onLanguage:mermaid"
   ],
   "scripts": {
     "compile": "node esbuild.mjs",

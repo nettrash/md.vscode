@@ -50,6 +50,12 @@ it.
   LaTeX stays Markdown-only, in a menu and in a batch. A diagram file's
   EPUB lists the whole document as its one contents entry — a DOT `#` line
   inside the graph is no longer mistaken for a heading. (#4)
+- **Mermaid files have a diagram panel.** A `.mmd` or `.mermaid` file
+  opens as Mermaid (comments with `%%`) and gets **Preview Diagram** — the
+  same panel as PlantUML and Graphviz files, with its zoom — and **Export
+  Diagram as SVG**. md knows a Mermaid file by its extension and never
+  guesses from the text, so a Markdown paragraph that begins "graph" or
+  "flowchart" stays a paragraph. (#5)
 
 ## [1.5.3] — 2026-10-09
 

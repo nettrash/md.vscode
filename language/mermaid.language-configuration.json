@@ -1,0 +1,17 @@
+{
+  "comment": [
+    "Mermaid editing behaviour for .mmd and .mermaid files — comments and",
+    "brackets only; md contributes no Mermaid grammar. Strict JSON, as the",
+    "PlantUML and Graphviz configurations are, so a test can JSON.parse it.",
+    "Mermaid's one comment form is a line starting with %%."
+  ],
+  "comments": { "lineComment": "%%" },
+  "brackets": [["{", "}"], ["[", "]"], ["(", ")"]],
+  "autoClosingPairs": [
+    { "open": "{", "close": "}" },
+    { "open": "[", "close": "]" },
+    { "open": "(", "close": ")" },
+    { "open": "\"", "close": "\"", "notIn": ["string"] }
+  ],
+  "surroundingPairs": [["{", "}"], ["[", "]"], ["(", ")"], ["\"", "\""]]
+}

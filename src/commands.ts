@@ -102,7 +102,14 @@ export async function resolveDocument(
 }
 
 /** Languages a command may run against, in the order we would rather find them. */
-const SUPPORTED_LANGUAGES: readonly string[] = ['markdown', 'plantuml', 'graphviz'];
+const SUPPORTED_LANGUAGES: readonly string[] = ['markdown', 'plantuml', 'graphviz', 'mermaid'];
+
+/**
+ * What HTML and EPUB take in a batch: Markdown and the two diagram languages
+ * `renderDocument` recognises in a bare file. A Mermaid file is offered Preview
+ * Diagram and SVG export only, so it is not in a batch either.
+ */
+const DOCUMENT_LANGUAGES: readonly string[] = ['markdown', 'plantuml', 'graphviz'];
 
 /**
  * The document a command should act on when it was given no resource.
@@ -170,14 +177,14 @@ const COMMANDS: readonly CommandSpec[] = [
     id: 'md.exportHtml',
     title: 'Export as HTML',
     run: exportHtml,
-    batch: { extension: 'html', label: 'HTML', bytes: (document) => htmlBytes(document, true), languages: SUPPORTED_LANGUAGES },
+    batch: { extension: 'html', label: 'HTML', bytes: (document) => htmlBytes(document, true), languages: DOCUMENT_LANGUAGES },
   },
   { id: 'md.exportPdf', title: 'Export as PDF', run: exportPdf },
   {
     id: 'md.exportEpub',
     title: 'Export as EPUB',
     run: exportEpub,
-    batch: { extension: 'epub', label: 'EPUB', bytes: (document) => epubBytes(document, true), languages: SUPPORTED_LANGUAGES },
+    batch: { extension: 'epub', label: 'EPUB', bytes: (document) => epubBytes(document, true), languages: DOCUMENT_LANGUAGES },
   },
   {
     id: 'md.exportLatex',
