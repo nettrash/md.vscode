@@ -82,6 +82,28 @@ export interface RenderOptions {
   plot?: boolean;
   /** Override the `<head>` asset URLs (VS Code rewrites these to webview URIs). No trailing slash. */
   assetBase?: string;
+  /**
+   * The document is known to be one bare diagram — an opened `.puml` or `.gv`
+   * file, by its language — whatever its text looks like. Without it the kind
+   * is sniffed from the text ({@link rawDiagramKind}), which cannot see a `.gv`
+   * file that opens with a DOT `#` preprocessor line.
+   */
+  diagram?: RawDiagram;
+}
+
+/** The two bare-diagram document kinds. */
+export type RawDiagram = 'plantuml' | 'graphviz';
+
+/**
+ * Which bare diagram `source` is, if any: the editor's language when it names
+ * one (`plantuml`, `graphviz`), otherwise what the text says
+ * ({@link isRawPlantUML}, {@link isRawGraphviz}).
+ */
+export function rawDiagramKind(source: string, languageId?: string): RawDiagram | null {
+  if (languageId === 'plantuml' || languageId === 'graphviz') return languageId;
+  if (isRawPlantUML(source)) return 'plantuml';
+  if (isRawGraphviz(source)) return 'graphviz';
+  return null;
 }
 
 export interface EngineNeeds {
@@ -258,7 +280,8 @@ export function renderBody(source: string, opts: RenderOptions): { html: string;
   // closing tag lands on its own line. The `needs` flags are hard-coded rather
   // than sniffed, because there is no Markdown here and therefore no math,
   // Mermaid or highlightable code possible.
-  if (isRawPlantUML(source)) {
+  const raw = opts.diagram ?? rawDiagramKind(source);
+  if (raw === 'plantuml') {
     // md-init.js turns the `.plantuml` container into an SVG offline; on
     // failure it restores the source, so an invalid diagram still shows its
     // text. PlantUML is not a host-side engine — it needs a real canvas's
@@ -273,7 +296,7 @@ export function renderBody(source: string, opts: RenderOptions): { html: string;
       needs: { math: false, mermaid: false, plantuml: true, graphviz: false, highlight: false },
     };
   }
-  if (isRawGraphviz(source)) {
+  if (raw === 'graphviz') {
     const svg = opts.engines?.graphviz?.(source, 'dot') ?? null;
     return {
       html: `<div class="graphviz" data-engine="dot">${svg ?? escapeHTML(source)}</div>`,

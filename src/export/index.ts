@@ -32,7 +32,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 
 import { frontMatter } from '../render/parser';
-import { renderDocument } from '../render/html';
+import { renderDocument, type RawDiagram } from '../render/html';
 import { readConfig } from '../preview/config';
 import { openDiagramPreview } from '../preview/diagramPreview';
 
@@ -101,7 +101,7 @@ export function latexBytes(document: vscode.TextDocument): Uint8Array {
  */
 export async function exportSvg(document: vscode.TextDocument): Promise<void> {
   const source = document.getText();
-  const available = diagrams(source);
+  const available = diagrams(source, knownDiagram(document));
   if (available.length === 0) {
     void vscode.window.showInformationMessage('md: no diagrams in this document.');
     return;
@@ -123,7 +123,7 @@ export async function exportSvg(document: vscode.TextDocument): Promise<void> {
   // initial colour, i.e. black on the viewer's own page — and `export: true`
   // only to keep the same page every other capture uses; it changes nothing in
   // the vector.
-  const html = renderDocument(source, { title, dark: false, export: true });
+  const html = renderDocument(source, { title, dark: false, export: true, diagram: knownDiagram(document) });
   const svg = await withRenderHost(html, title, 'Rendering the diagram…', (host) =>
     host.diagramSVG(diagram.ordinal),
   );
@@ -133,6 +133,16 @@ export async function exportSvg(document: vscode.TextDocument): Promise<void> {
     throw new Error("This diagram couldn't be captured — it may have failed to render.");
   }
   await write(destination, Buffer.from(standaloneDocument(svg), 'utf8'));
+}
+
+/**
+ * The bare diagram a document is by its language — a `.puml` or `.gv` file the
+ * editor opened as PlantUML or Graphviz — so it is drawn as one even when its
+ * text alone would not say so (a DOT file that opens with a `#` line).
+ * Undefined for Markdown, which is sniffed as before.
+ */
+function knownDiagram(document: vscode.TextDocument): RawDiagram | undefined {
+  return document.languageId === 'plantuml' || document.languageId === 'graphviz' ? document.languageId : undefined;
 }
 
 // MARK: - HTML  (ship order 3 — capture plus KaTeX inlining)
@@ -154,7 +164,7 @@ export async function htmlBytes(
   quiet = false,
 ): Promise<Uint8Array> {
   const title = baseName(document);
-  const input = exportDocumentHTML(document.getText(), title);
+  const input = exportDocumentHTML(document.getText(), title, knownDiagram(document));
   const captured = await withRenderHost(
     input,
     title,
@@ -194,7 +204,7 @@ export async function epubBytes(
 ): Promise<Uint8Array> {
   const source = document.getText();
   const title = documentTitle(frontMatter(source), baseName(document));
-  const html = renderDocument(source, { title, dark: false, export: true });
+  const html = renderDocument(source, { title, dark: false, export: true, diagram: knownDiagram(document) });
   let body = bodyContent(html);
   const ranges = richElementRanges(body);
   const images: EpubImage[] = [];
@@ -224,7 +234,7 @@ export async function epubBytes(
     title,
     body: xhtml(body),
     images,
-    outline: epubOutline(source),
+    outline: epubOutline(source, knownDiagram(document)),
     modified: modifiedNow(),
   });
 }
@@ -247,7 +257,7 @@ export async function epubBytes(
 export async function exportPdf(document: vscode.TextDocument): Promise<void> {
   const title = baseName(document);
   const size = pageSizeNamed(readConfig(document.uri).pageSize);
-  const html = pdfDocumentHTML(document.getText(), title, size);
+  const html = pdfDocumentHTML(document.getText(), title, size, knownDiagram(document));
 
   try {
     await vscode.window.withProgress(
