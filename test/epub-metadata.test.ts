@@ -262,7 +262,8 @@ describe('fetching an https cover', () => {
       const headers = new Headers();
       if (reply.location !== undefined) headers.set('location', reply.location);
       if (reply.length !== undefined) headers.set('content-length', String(reply.length));
-      return new Response(reply.status >= 300 && reply.status < 400 ? null : (reply.body ?? new Uint8Array()), {
+      const body = reply.status >= 300 && reply.status < 400 ? null : ((reply.body ?? new Uint8Array()) as unknown as BodyInit);
+      return new Response(body, {
         status: reply.status,
         headers,
       });
