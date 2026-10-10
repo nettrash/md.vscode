@@ -45,7 +45,7 @@ import {
   packEntries,
 } from './textbundle';
 import { archive } from './zip';
-import { readLocalAsset } from './asset-reader';
+import { isInside, readLocalAsset } from './asset-reader';
 import { readConfig } from '../preview/config';
 import { openDiagramPreview } from '../preview/diagramPreview';
 
@@ -154,20 +154,28 @@ export async function exportSvg(document: vscode.TextDocument): Promise<void> {
 /**
  * Read an image the document references by a relative path, from beside the
  * document. On the local disk that is `readLocalAsset`, which resolves symlinks
- * before its containment test; anywhere else (a virtual workspace) VS Code's
- * file system, with the same lexical test: the path must lie strictly inside
- * the document's own folder. An untitled document has no folder and finds
- * nothing.
+ * before its containment test. Anywhere else — a remote or virtual workspace —
+ * there is no real path to resolve, so the path must lie lexically inside the
+ * document's folder and **no component of it may be a symbolic link**: each
+ * step from the folder down is looked at through VS Code's file system, and a
+ * link anywhere leaves the image unresolved rather than followed. An untitled
+ * document has no folder and finds nothing.
  */
 async function readAsset(document: vscode.TextDocument, relativePath: string): Promise<Uint8Array | null> {
   if (document.isUntitled) return null;
   if (document.uri.scheme === 'file') return readLocalAsset(relativePath, document.uri.fsPath);
   const folder = vscode.Uri.joinPath(document.uri, '..');
   const candidate = vscode.Uri.joinPath(folder, relativePath);
-  const prefix = folder.path.endsWith('/') ? folder.path : `${folder.path}/`;
-  if (!candidate.path.startsWith(prefix)) return null;
+  if (!isInside(folder.path, candidate.path, path.posix)) return null;
   try {
-    if ((await vscode.workspace.fs.stat(candidate)).type & vscode.FileType.Directory) return null;
+    const steps = path.posix.relative(folder.path, candidate.path).split('/');
+    let step = folder;
+    for (let index = 0; index < steps.length; index++) {
+      step = vscode.Uri.joinPath(step, steps[index]);
+      const type = (await vscode.workspace.fs.stat(step)).type;
+      if (type & vscode.FileType.SymbolicLink) return null;
+      if (index === steps.length - 1 && !(type & vscode.FileType.File)) return null;
+    }
     return await vscode.workspace.fs.readFile(candidate);
   } catch {
     return null;
@@ -233,16 +241,25 @@ export async function exportTextBundle(document: vscode.TextDocument): Promise<v
       replace,
     );
     if (answer !== replace) return;
-    await vscode.workspace.fs.delete(target, { recursive: true, useTrash: false });
   }
 
+  // The new bundle is written whole beside the old one first and only then
+  // moved over it, so a failure part-way — an unreadable image, a full disk —
+  // leaves the existing bundle untouched rather than deleted and half-replaced.
   const files = bundleFiles(await bundleRewrite(document));
-  const assets = vscode.Uri.joinPath(target, ASSETS_DIRECTORY_NAME);
-  await vscode.workspace.fs.createDirectory(assets);
-  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(target, INFO_FILE_NAME), files.info);
-  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(target, TEXT_FILE_NAME), files.text);
-  for (const asset of files.assets) {
-    await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(assets, asset.name), asset.data);
+  const staging = vscode.Uri.joinPath(chosen[0], `.${title}${BUNDLE_EXTENSION}.md-${Date.now().toString(36)}`);
+  try {
+    const assets = vscode.Uri.joinPath(staging, ASSETS_DIRECTORY_NAME);
+    await vscode.workspace.fs.createDirectory(assets);
+    await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(staging, INFO_FILE_NAME), files.info);
+    await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(staging, TEXT_FILE_NAME), files.text);
+    for (const asset of files.assets) {
+      await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(assets, asset.name), asset.data);
+    }
+    await vscode.workspace.fs.rename(staging, target, { overwrite: true });
+  } catch (error) {
+    await Promise.resolve(vscode.workspace.fs.delete(staging, { recursive: true, useTrash: false })).catch(() => undefined);
+    throw error;
   }
   const reveal = 'Reveal';
   const choice = await vscode.window.showInformationMessage(`md: exported ${title}${BUNDLE_EXTENSION}`, reveal);
