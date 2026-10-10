@@ -15,7 +15,7 @@ READMEs. Formulas and chemical equations, charts drawn from the function
 you write, Mermaid flowcharts, Graphviz graphs, PlantUML drawings, data
 pasted straight out of a spreadsheet, footnotes, front matter and
 highlighted code all render as you type, and the finished document exports
-to HTML, PDF, EPUB, LaTeX, TextBundle or SVG.
+to HTML, PDF, EPUB, LaTeX, TextBundle, TextPack or SVG.
 
 The first thing worth knowing: it **extends VS Code's built-in Markdown
 preview** rather than opening a window of its own. *Open Preview*
