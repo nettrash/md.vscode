@@ -33,7 +33,7 @@
 //  at.
 //
 
-import { renderDocument } from '../render/html';
+import { renderDocument, type RawDiagram } from '../render/html';
 import { RenderHost } from './renderHost';
 
 // MARK: - Trim sizes
@@ -148,9 +148,9 @@ export function styledForExport(html: string, size: PageSize): string {
  * body padding is the margin, and asking the printer for one as well would
  * inset the text twice.
  */
-export function pdfDocumentHTML(source: string, title: string, size: PageSize): string {
+export function pdfDocumentHTML(source: string, title: string, size: PageSize, diagram?: RawDiagram): string {
   const html = styledForExport(
-    renderDocument(source, { title, dark: false, export: true }),
+    renderDocument(source, { title, dark: false, export: true, diagram }),
     size,
   );
   const pageRule =

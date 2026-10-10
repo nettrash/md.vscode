@@ -53,3 +53,22 @@ export function countLabel(
 export function readingMinutes(words: number): number {
   return Math.max(1, Math.round(words / 230));
 }
+
+/**
+ * The count of a multi-selection: each selection counted on its own and the
+ * counts added, so nothing that was not selected — no separator between two
+ * selections — is counted, and empty carets add nothing. Undefined when no
+ * selection holds any text.
+ */
+export function selectionCount(texts: readonly string[]): { words: number; characters: number } | undefined {
+  let words = 0;
+  let characters = 0;
+  let any = false;
+  for (const text of texts) {
+    if (text.length === 0) continue;
+    any = true;
+    words += countWords(text);
+    characters += countCharacters(text);
+  }
+  return any ? { words, characters } : undefined;
+}
