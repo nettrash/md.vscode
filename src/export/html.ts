@@ -31,7 +31,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { renderDocument } from '../render/html';
+import { renderDocument, type RawDiagram } from '../render/html';
 import { richRoot } from '../engines/paths';
 
 /**
@@ -61,8 +61,8 @@ const SCREEN_PAGEBREAK_RULE =
  * threads through every export call site on the apps can never take effect.
  * Wiring the VS Code theme in here would diverge from all three of them.
  */
-export function exportDocumentHTML(source: string, title: string): string {
-  return renderDocument(source, { title, dark: false, export: true }).replaceAll(
+export function exportDocumentHTML(source: string, title: string, diagram?: RawDiagram): string {
+  return renderDocument(source, { title, dark: false, export: true, diagram }).replaceAll(
     EXPORT_PAGEBREAK_RULE,
     SCREEN_PAGEBREAK_RULE,
   );

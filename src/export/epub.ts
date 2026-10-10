@@ -27,7 +27,7 @@
 //
 
 import type { MetadataField, OutlineEntry } from '../render/types';
-import { isRawGraphviz, isRawPlantUML, renderDocument } from '../render/html';
+import { rawDiagramKind, renderDocument, type RawDiagram } from '../render/html';
 import { outline } from '../render/parser';
 import { trimWSNL } from '../render/text';
 import { archive, assertEpubOrder, EPUB_MIMETYPE, type ZipEntry } from './zip';
@@ -489,8 +489,8 @@ export function imageHref(unitID: string, ordinal: number): string {
  * anchors that do not exist — so a diagram file gets the single whole-document
  * entry a headingless Markdown file gets.
  */
-export function epubOutline(source: string): OutlineEntry[] {
-  return isRawPlantUML(source) || isRawGraphviz(source) ? [] : outline(source);
+export function epubOutline(source: string, diagram?: RawDiagram): OutlineEntry[] {
+  return (diagram ?? rawDiagramKind(source)) !== null ? [] : outline(source);
 }
 
 /**
