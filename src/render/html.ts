@@ -83,9 +83,9 @@ export interface RenderOptions {
   /** Override the `<head>` asset URLs (VS Code rewrites these to webview URIs). No trailing slash. */
   assetBase?: string;
   /**
-   * The document is known to be one bare diagram — an opened `.puml` or `.gv`
-   * file, by its language — whatever its text looks like. Without it the kind
-   * is sniffed from the text ({@link rawDiagramKind}), which cannot see a `.gv`
+   * The document is known to be one bare diagram — an opened `.gv` file, by
+   * its language — whatever its text looks like. Without it the kind is
+   * sniffed from the text ({@link rawDiagramKind}), which cannot see a `.gv`
    * file that opens with a DOT `#` preprocessor line.
    */
   diagram?: RawDiagram;
@@ -95,12 +95,14 @@ export interface RenderOptions {
 export type RawDiagram = 'plantuml' | 'graphviz';
 
 /**
- * Which bare diagram `source` is, if any: the editor's language when it names
- * one (`plantuml`, `graphviz`), otherwise what the text says
- * ({@link isRawPlantUML}, {@link isRawGraphviz}).
+ * Which bare diagram `source` is, if any. A Graphviz document is one by its
+ * language: DOT has no marker line the text could be recognised by when it
+ * opens with a `#` preprocessor line. PlantUML is always read from the text,
+ * because its language also covers `.iuml` include fragments, which have no
+ * `@start…` line and are not diagrams — the rule the diagram panel follows.
  */
 export function rawDiagramKind(source: string, languageId?: string): RawDiagram | null {
-  if (languageId === 'plantuml' || languageId === 'graphviz') return languageId;
+  if (languageId === 'graphviz') return 'graphviz';
   if (isRawPlantUML(source)) return 'plantuml';
   if (isRawGraphviz(source)) return 'graphviz';
   return null;
