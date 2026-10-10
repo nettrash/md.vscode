@@ -31,10 +31,24 @@ export function headingRows(entries: readonly OutlineEntry[]): GoToRow[] {
   }));
 }
 
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+/**
+ * `text` cut to at most `limit` user-perceived characters, the last of them an
+ * ellipsis when anything was cut. Counted and cut by grapheme, so an emoji, a
+ * flag or a letter with its accent is never split into a lone surrogate or a
+ * stray mark at the cut.
+ */
+export function truncated(text: string, limit: number): string {
+  const segments = Array.from(graphemes.segment(text), (s) => s.segment);
+  if (segments.length <= limit) return text;
+  return segments.slice(0, limit - 1).join('').trimEnd() + '…';
+}
+
 export function noteRows(entries: readonly NoteEntry[]): GoToRow[] {
   return entries.map((e) => {
     const flat = e.text.replace(/\s+/g, ' ').trim();
-    const label = flat.length > NOTE_PREVIEW_LENGTH ? flat.slice(0, NOTE_PREVIEW_LENGTH - 1).trimEnd() + '…' : flat;
+    const label = truncated(flat, NOTE_PREVIEW_LENGTH);
     return { label: label === '' ? '(empty note)' : label, description: `line ${e.line + 1}`, line: e.line };
   });
 }
