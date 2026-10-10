@@ -50,8 +50,11 @@ import {
   exportLatex,
   exportPdf,
   exportSvg,
+  exportTextBundle,
+  exportTextPack,
   htmlBytes,
   latexBytes,
+  textPackBytes,
   showDiagramPreview,
 } from './export/index';
 
@@ -191,6 +194,13 @@ const COMMANDS: readonly CommandSpec[] = [
     title: 'Export as LaTeX',
     run: exportLatex,
     batch: { extension: 'tex', label: 'LaTeX', bytes: latexBytes, languages: ['markdown'] },
+  },
+  { id: 'md.exportTextBundle', title: 'Export as TextBundle', run: exportTextBundle },
+  {
+    id: 'md.exportTextPack',
+    title: 'Export as TextPack',
+    run: exportTextPack,
+    batch: { extension: 'textpack', label: 'TextPack', bytes: textPackBytes, languages: ['markdown'] },
   },
   { id: 'md.exportSvg', title: 'Export Diagram as SVG', run: exportSvg },
   { id: 'md.showDiagramPreview', title: 'Preview Diagram', run: showDiagramPreview },
