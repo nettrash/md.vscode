@@ -21,6 +21,8 @@ missing between the two, because the number is the family's rather than
 this extension's own count, and this extension has simply stepped into
 it.
 
+## [1.6.0] — 2026-10-10
+
 ## [1.5.3] — 2026-10-09
 
 ### Added
