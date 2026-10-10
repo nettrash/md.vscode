@@ -15,7 +15,7 @@ READMEs. Formulas and chemical equations, charts drawn from the function
 you write, Mermaid flowcharts, Graphviz graphs, PlantUML drawings, data
 pasted straight out of a spreadsheet, footnotes, front matter and
 highlighted code all render as you type, and the finished document exports
-to HTML, PDF, EPUB, LaTeX or SVG.
+to HTML, PDF, EPUB, LaTeX, TextBundle or SVG.
 
 The first thing worth knowing: it **extends VS Code's built-in Markdown
 preview** rather than opening a window of its own. *Open Preview*
@@ -215,8 +215,11 @@ and a chart travels into that book as vector, while a diagram arrives as a
 picture. *Export as LaTeX…* writes `.tex` in which your mathematics is still
 the `$…$` you typed rather than a picture of it; a diagram or a chart
 travels as the source you wrote, under a comment naming its language.
-*Export Diagram as SVG…* saves one diagram, or one chart, as a real vector
-file.
+*Export as TextBundle…* and *Export as TextPack…* write the format Bear,
+Ulysses and every md app share: the text with an `assets/` folder holding
+each image the document refers to by a relative path, so it arrives with
+its pictures. *Export Diagram as SVG…* saves one diagram, or one chart, as
+a real vector file.
 
 All of them are on the right-click menu as well as in the Command
 Palette: **md: Export** opens as a submenu on a Markdown file in the
@@ -228,8 +231,8 @@ the file is open.
 
 ### A folder of Markdown at once
 
-Select several Markdown files in the Explorer and *HTML*, *EPUB* or
-*LaTeX* exports all of them: one question — which folder — then a
+Select several Markdown files in the Explorer and *HTML*, *EPUB*,
+*LaTeX* or *TextPack* exports all of them: one question — which folder — then a
 cancellable progress notification counting through the files, and one
 line at the end saying how many landed, naming any that failed and any
 non-Markdown file that was skipped. Each export takes its own source
@@ -282,6 +285,8 @@ the context menus below.
 | **md: Export as PDF…** | The rendered document as a PDF, at the size in `md.export.pageSize` | a Markdown, PlantUML or Graphviz editor is active, or one such file is selected |
 | **md: Export as EPUB…** | An e-book with the document's headings as its contents | a Markdown, PlantUML or Graphviz editor is active, or such files are selected — in batch too |
 | **md: Export as LaTeX…** | `.tex` source, mathematics kept as mathematics | a Markdown editor is active, or Markdown files are selected — in batch too |
+| **md: Export as TextBundle…** | A `.textbundle` folder: `text.md`, `info.json` and the document's local images in `assets/` | a Markdown editor is active, or one Markdown file is selected |
+| **md: Export as TextPack…** | The same bundle zipped into one `.textpack` file | a Markdown editor is active, or Markdown files are selected — in batch too |
 | **md: Export Diagram as SVG…** | One Mermaid, Graphviz or PlantUML diagram, or one chart, as a vector file | a Markdown, PlantUML, Graphviz or Mermaid editor is active, or one diagram file is selected |
 | **md: Preview Diagram** | Opens the diagram panel beside a diagram file | a PlantUML, Graphviz or Mermaid editor is active, or one diagram file is selected |
 | **md: Go to Heading…** / **Go to Note…** | Jump to a heading, or to one of the document's private notes, from a list that follows as you move through it | a Markdown editor is active |

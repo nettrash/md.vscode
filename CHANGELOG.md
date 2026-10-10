@@ -56,6 +56,16 @@ it.
   Diagram as SVG**. md knows a Mermaid file by its extension and never
   guesses from the text, so a Markdown paragraph that begins "graph" or
   "flowchart" stays a paragraph. (#5)
+- **Export as TextBundle… and Export as TextPack….** The sixth export
+  every md app already has: `text.md`, the canonical `info.json`, and an
+  `assets/` folder holding each image the document refers to by a
+  relative path, its reference rewritten to `assets/…` — so Bear, Ulysses
+  or another md app opens the document with its pictures. Remote and
+  `data:` images stay as written and nothing is fetched; an image outside
+  the document's folder, by `../` or by a symlink, is left as written
+  rather than copied. TextPack (the bundle zipped) also goes in a
+  multi-file batch. Both are byte-compatible with md for iPhone, Mac,
+  Windows and Android, held to md for Windows's own test vectors. (#6)
 
 ## [1.5.3] — 2026-10-09
 

@@ -34,6 +34,18 @@ import * as vscode from 'vscode';
 import { frontMatter } from '../render/parser';
 import { renderDocument } from '../render/html';
 import { renderableSource } from '../render/mermaid-file';
+import {
+  ASSETS_DIRECTORY_NAME,
+  BUNDLE_EXTENSION,
+  INFO_FILE_NAME,
+  TEXT_FILE_NAME,
+  bundleFiles,
+  exportRewriting,
+  isLocalRelativeReference,
+  packEntries,
+} from './textbundle';
+import { archive } from './zip';
+import { readLocalAsset } from './asset-reader';
 import { readConfig } from '../preview/config';
 import { openDiagramPreview } from '../preview/diagramPreview';
 
@@ -135,6 +147,117 @@ export async function exportSvg(document: vscode.TextDocument): Promise<void> {
     throw new Error("This diagram couldn't be captured — it may have failed to render.");
   }
   await write(destination, Buffer.from(standaloneDocument(svg), 'utf8'));
+}
+
+// MARK: - TextBundle and TextPack  (the family's sixth export)
+
+/**
+ * Read an image the document references by a relative path, from beside the
+ * document. On the local disk that is `readLocalAsset`, which resolves symlinks
+ * before its containment test; anywhere else (a virtual workspace) VS Code's
+ * file system, with the same lexical test: the path must lie strictly inside
+ * the document's own folder. An untitled document has no folder and finds
+ * nothing.
+ */
+async function readAsset(document: vscode.TextDocument, relativePath: string): Promise<Uint8Array | null> {
+  if (document.isUntitled) return null;
+  if (document.uri.scheme === 'file') return readLocalAsset(relativePath, document.uri.fsPath);
+  const folder = vscode.Uri.joinPath(document.uri, '..');
+  const candidate = vscode.Uri.joinPath(folder, relativePath);
+  const prefix = folder.path.endsWith('/') ? folder.path : `${folder.path}/`;
+  if (!candidate.path.startsWith(prefix)) return null;
+  try {
+    if ((await vscode.workspace.fs.stat(candidate)).type & vscode.FileType.Directory) return null;
+    return await vscode.workspace.fs.readFile(candidate);
+  } catch {
+    return null;
+  }
+}
+
+/** The document rewritten for a bundle, its local images read from beside it. */
+async function bundleRewrite(document: vscode.TextDocument) {
+  return exportRewriting(document.getText(), (relative) => readAsset(document, relative));
+}
+
+/** The `.textpack`, as bytes and without a dialogue. See `latexBytes`. */
+export async function textPackBytes(document: vscode.TextDocument): Promise<Uint8Array> {
+  return archive(packEntries(sanitized(baseName(document)), await bundleRewrite(document)));
+}
+
+/**
+ * Save the document as a `.textpack`: the bundle zipped, as every md app writes
+ * it. A note follows when the document is untitled and refers to local images —
+ * it has no folder for them to be found in, so they stay as written.
+ */
+export async function exportTextPack(document: vscode.TextDocument): Promise<void> {
+  const title = baseName(document);
+  const destination = await askWhereToSave(document, title, 'textpack', { TextPack: ['textpack'] });
+  if (destination === null) return;
+  await write(destination, await textPackBytes(document));
+  untitledImageNote(document);
+}
+
+/**
+ * Write the document as a `<name>.textbundle` folder into a folder the author
+ * picks — a save dialogue cannot portably name a directory, so the parent is
+ * chosen, as on Windows — and ask before replacing a bundle already there. A
+ * replaced bundle is replaced whole: an image from an earlier export must not
+ * linger in its assets/.
+ */
+export async function exportTextBundle(document: vscode.TextDocument): Promise<void> {
+  const title = sanitized(baseName(document));
+  const near = document.isUntitled ? vscode.workspace.workspaceFolders?.[0]?.uri : vscode.Uri.joinPath(document.uri, '..');
+  const chosen = await vscode.window.showOpenDialog({
+    defaultUri: near,
+    canSelectFolders: true,
+    canSelectFiles: false,
+    canSelectMany: false,
+    openLabel: 'Export Here',
+    title: `Export as TextBundle — choose the folder to put ${title}${BUNDLE_EXTENSION} in`,
+  });
+  if (chosen === undefined || chosen.length === 0) return;
+  const target = vscode.Uri.joinPath(chosen[0], `${title}${BUNDLE_EXTENSION}`);
+
+  let exists = false;
+  try {
+    await vscode.workspace.fs.stat(target);
+    exists = true;
+  } catch {
+    exists = false;
+  }
+  if (exists) {
+    const replace = 'Replace';
+    const answer = await vscode.window.showWarningMessage(
+      `${title}${BUNDLE_EXTENSION} already exists in that folder. Replace it?`,
+      { modal: true },
+      replace,
+    );
+    if (answer !== replace) return;
+    await vscode.workspace.fs.delete(target, { recursive: true, useTrash: false });
+  }
+
+  const files = bundleFiles(await bundleRewrite(document));
+  const assets = vscode.Uri.joinPath(target, ASSETS_DIRECTORY_NAME);
+  await vscode.workspace.fs.createDirectory(assets);
+  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(target, INFO_FILE_NAME), files.info);
+  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(target, TEXT_FILE_NAME), files.text);
+  for (const asset of files.assets) {
+    await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(assets, asset.name), asset.data);
+  }
+  const reveal = 'Reveal';
+  const choice = await vscode.window.showInformationMessage(`md: exported ${title}${BUNDLE_EXTENSION}`, reveal);
+  if (choice === reveal) await vscode.commands.executeCommand('revealFileInOS', target);
+  untitledImageNote(document);
+}
+
+/** Say once, after the export, why an untitled document's local images were not bundled. */
+function untitledImageNote(document: vscode.TextDocument): void {
+  if (!document.isUntitled) return;
+  const local = [...document.getText().matchAll(/!\[[^\]]*\]\(([^)\s]+)/g)].filter((m) => isLocalRelativeReference(m[1]));
+  if (local.length === 0) return;
+  void vscode.window.showInformationMessage(
+    'md: this document is not saved yet, so it has no folder to find its local images in — they stay as written. Save it first to bundle them.',
+  );
 }
 
 // MARK: - HTML  (ship order 3 — capture plus KaTeX inlining)

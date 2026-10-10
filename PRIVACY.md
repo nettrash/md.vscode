@@ -41,7 +41,10 @@ md is a renderer, not a filing system. The files you open, edit and save
 are handled entirely by VS Code — its editors, its workspace, its save
 dialogs — and are stored wherever you choose. We never see them. The
 extension reads the document you are previewing and writes only the file
-you name when you ask for an export. It also works in a folder you have
+or bundle you name when you ask for an export. A TextBundle or TextPack
+export also reads the images your document refers to by a relative path,
+from the document's own folder only, and copies them into what it
+writes. It also works in a folder you have
 not trusted (Restricted Mode) and in a virtual workspace such as GitHub
 Repositories, because nothing in it runs anything the folder supplies: it
 draws the text VS Code hands it with engines carried inside the
