@@ -2,7 +2,7 @@
   "name": "md-vscode",
   "displayName": "md",
   "description": "Markdown preview with math, chemistry, charts and diagrams: KaTeX, Mermaid, Graphviz, PlantUML and a built-in plotter, all on-device with nothing sent anywhere. Exports to HTML, PDF, EPUB, LaTeX and SVG.",
-  "version": "1.5.3",
+  "version": "1.6.0",
   "publisher": "nettrash",
   "license": "MIT",
   "author": {
@@ -47,6 +47,17 @@
     "vscode": "^1.95.0"
   },
   "main": "./dist/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "md renders the document VS Code hands it and writes nothing unless you export. In Restricted Mode the two font settings are read from your user settings only, never from the workspace.",
+      "restrictedConfigurations": [
+        "md.preview.bodyFont",
+        "md.preview.codeFont"
+      ]
+    },
+    "virtualWorkspaces": true
+  },
   "contributes": {
     "markdown.markdownItPlugins": true,
     "markdown.previewScripts": [

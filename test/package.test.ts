@@ -375,6 +375,30 @@ describe('contributes.keybindings — zoom, and only in the diagram panel', () =
   });
 });
 
+describe('capabilities — Restricted Mode and virtual workspaces', () => {
+  const capabilities = (manifest as unknown as {
+    capabilities: {
+      untrustedWorkspaces: { supported: boolean | 'limited'; description?: string; restrictedConfigurations?: string[] };
+      virtualWorkspaces: boolean;
+    };
+  }).capabilities;
+
+  it("supports untrusted workspaces in the 'limited' form, keeping the two font stacks to user settings", () => {
+    expect(capabilities.untrustedWorkspaces.supported).toBe('limited');
+    expect(capabilities.untrustedWorkspaces.description?.length).toBeGreaterThan(0);
+    expect(capabilities.untrustedWorkspaces.restrictedConfigurations).toEqual(['md.preview.bodyFont', 'md.preview.codeFont']);
+  });
+
+  it('restricts only settings it declares', () => {
+    const declared = Object.keys((configuration as { properties: Record<string, unknown> }).properties);
+    for (const key of capabilities.untrustedWorkspaces.restrictedConfigurations ?? []) expect(declared).toContain(key);
+  });
+
+  it('supports virtual workspaces', () => {
+    expect(capabilities.virtualWorkspaces).toBe(true);
+  });
+});
+
 describe('contributes.menus — nothing dangling', () => {
   it('names only commands that are declared', () => {
     const declared = new Set(commands.map((entry) => entry.command));
