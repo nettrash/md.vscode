@@ -142,6 +142,12 @@ export const workspace = {
 };
 
 export const window = {
+  /** Every `showTextDocument` call, for the Go to tests. */
+  shown: [] as unknown[],
+  showTextDocument(document: unknown): Promise<void> {
+    window.shown.push(document);
+    return Promise.resolve();
+  },
   get activeColorTheme(): { kind: number } {
     return { kind: state().themeKind };
   },
@@ -210,6 +216,17 @@ export class Range {
     this.end = new Position(endLine as number, endCharacter as number);
   }
 }
+
+export class Selection extends Range {
+  constructor(
+    readonly anchor: Position,
+    readonly active: Position,
+  ) {
+    super(anchor, active);
+  }
+}
+
+export const TextEditorRevealType = { Default: 0, InCenter: 1, InCenterIfOutsideViewport: 2, AtTop: 3 };
 
 export const DiagnosticSeverity = { Error: 0, Warning: 1, Information: 2, Hint: 3 };
 

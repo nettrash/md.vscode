@@ -31,8 +31,22 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 
-import { frontMatter, outline } from '../render/parser';
-import { renderDocument } from '../render/html';
+import { frontMatter } from '../render/parser';
+import { rawDiagramKind, renderDocument, type RawDiagram } from '../render/html';
+import { renderableSource } from '../render/mermaid-file';
+import {
+  ASSETS_DIRECTORY_NAME,
+  BUNDLE_EXTENSION,
+  INFO_FILE_NAME,
+  TEXT_FILE_NAME,
+  bundleFiles,
+  exportRewriting,
+  isLocalRelativeReference,
+  packEntries,
+} from './textbundle';
+import { archive } from './zip';
+import { isInside, readLocalAsset } from './asset-reader';
+import { coverReference, epubMetadata, fieldValue, MAX_COVER_BYTES, recogniseCover, type EpubCover } from './epub-metadata';
 import { readConfig } from '../preview/config';
 import { openDiagramPreview } from '../preview/diagramPreview';
 
@@ -48,6 +62,7 @@ import {
   richElementRanges,
   xhtml,
   type EpubImage,
+  epubOutline,
 } from './epub';
 import { exportDocumentHTML, selfContainedHTML as finishSelfContainedHTML } from './html';
 import { latexDocument } from './latex';
@@ -99,8 +114,9 @@ export function latexBytes(document: vscode.TextDocument): Uint8Array {
  * nothing to render and no dialogue worth opening.
  */
 export async function exportSvg(document: vscode.TextDocument): Promise<void> {
-  const source = document.getText();
-  const available = diagrams(source);
+  // A Mermaid file is its one diagram, wrapped in a fence of its own (#5).
+  const source = renderableSource(document.getText(), document.languageId);
+  const available = diagrams(source, knownDiagram(document));
   if (available.length === 0) {
     void vscode.window.showInformationMessage('md: no diagrams in this document.');
     return;
@@ -122,7 +138,7 @@ export async function exportSvg(document: vscode.TextDocument): Promise<void> {
   // initial colour, i.e. black on the viewer's own page — and `export: true`
   // only to keep the same page every other capture uses; it changes nothing in
   // the vector.
-  const html = renderDocument(source, { title, dark: false, export: true });
+  const html = renderDocument(source, { title, dark: false, export: true, diagram: knownDiagram(document) });
   const svg = await withRenderHost(html, title, 'Rendering the diagram…', (host) =>
     host.diagramSVG(diagram.ordinal),
   );
@@ -132,6 +148,145 @@ export async function exportSvg(document: vscode.TextDocument): Promise<void> {
     throw new Error("This diagram couldn't be captured — it may have failed to render.");
   }
   await write(destination, Buffer.from(standaloneDocument(svg), 'utf8'));
+}
+
+// MARK: - TextBundle and TextPack  (the family's sixth export)
+
+/**
+ * Read an image the document references by a relative path, from beside the
+ * document. On the local disk that is `readLocalAsset`, which resolves symlinks
+ * before its containment test. Anywhere else — a remote or virtual workspace —
+ * there is no real path to resolve, so the path must lie lexically inside the
+ * document's folder and **no component of it may be a symbolic link**: each
+ * step from the folder down is looked at through VS Code's file system, and a
+ * link anywhere leaves the image unresolved rather than followed. An untitled
+ * document has no folder and finds nothing.
+ */
+async function readAsset(document: vscode.TextDocument, relativePath: string): Promise<Uint8Array | null> {
+  if (document.isUntitled) return null;
+  if (document.uri.scheme === 'file') return readLocalAsset(relativePath, document.uri.fsPath);
+  const folder = vscode.Uri.joinPath(document.uri, '..');
+  const candidate = vscode.Uri.joinPath(folder, relativePath);
+  if (!isInside(folder.path, candidate.path, path.posix)) return null;
+  try {
+    const steps = path.posix.relative(folder.path, candidate.path).split('/');
+    let step = folder;
+    for (let index = 0; index < steps.length; index++) {
+      step = vscode.Uri.joinPath(step, steps[index]);
+      const type = (await vscode.workspace.fs.stat(step)).type;
+      if (type & vscode.FileType.SymbolicLink) return null;
+      if (index === steps.length - 1 && !(type & vscode.FileType.File)) return null;
+    }
+    return await vscode.workspace.fs.readFile(candidate);
+  } catch {
+    return null;
+  }
+}
+
+/** The document rewritten for a bundle, its local images read from beside it. */
+async function bundleRewrite(document: vscode.TextDocument) {
+  return exportRewriting(document.getText(), (relative) => readAsset(document, relative));
+}
+
+/** The `.textpack`, as bytes and without a dialogue. See `latexBytes`. */
+export async function textPackBytes(document: vscode.TextDocument): Promise<Uint8Array> {
+  return archive(packEntries(sanitized(baseName(document)), await bundleRewrite(document)));
+}
+
+/**
+ * Save the document as a `.textpack`: the bundle zipped, as every md app writes
+ * it. A note follows when the document is untitled and refers to local images —
+ * it has no folder for them to be found in, so they stay as written.
+ */
+export async function exportTextPack(document: vscode.TextDocument): Promise<void> {
+  const title = baseName(document);
+  const destination = await askWhereToSave(document, title, 'textpack', { TextPack: ['textpack'] });
+  if (destination === null) return;
+  await write(destination, await textPackBytes(document));
+  untitledImageNote(document);
+}
+
+/**
+ * Write the document as a `<name>.textbundle` folder into a folder the author
+ * picks — a save dialogue cannot portably name a directory, so the parent is
+ * chosen, as on Windows — and ask before replacing a bundle already there. A
+ * replaced bundle is replaced whole: an image from an earlier export must not
+ * linger in its assets/.
+ */
+export async function exportTextBundle(document: vscode.TextDocument): Promise<void> {
+  const title = sanitized(baseName(document));
+  const near = document.isUntitled ? vscode.workspace.workspaceFolders?.[0]?.uri : vscode.Uri.joinPath(document.uri, '..');
+  const chosen = await vscode.window.showOpenDialog({
+    defaultUri: near,
+    canSelectFolders: true,
+    canSelectFiles: false,
+    canSelectMany: false,
+    openLabel: 'Export Here',
+    title: `Export as TextBundle — choose the folder to put ${title}${BUNDLE_EXTENSION} in`,
+  });
+  if (chosen === undefined || chosen.length === 0) return;
+  const target = vscode.Uri.joinPath(chosen[0], `${title}${BUNDLE_EXTENSION}`);
+
+  let exists = false;
+  try {
+    await vscode.workspace.fs.stat(target);
+    exists = true;
+  } catch {
+    exists = false;
+  }
+  if (exists) {
+    const replace = 'Replace';
+    const answer = await vscode.window.showWarningMessage(
+      `${title}${BUNDLE_EXTENSION} already exists in that folder. Replace it?`,
+      { modal: true },
+      replace,
+    );
+    if (answer !== replace) return;
+  }
+
+  // The new bundle is written whole beside the old one first and only then
+  // moved over it, so a failure part-way — an unreadable image, a full disk —
+  // leaves the existing bundle untouched rather than deleted and half-replaced.
+  const files = bundleFiles(await bundleRewrite(document));
+  const staging = vscode.Uri.joinPath(chosen[0], `.${title}${BUNDLE_EXTENSION}.md-${Date.now().toString(36)}`);
+  try {
+    const assets = vscode.Uri.joinPath(staging, ASSETS_DIRECTORY_NAME);
+    await vscode.workspace.fs.createDirectory(assets);
+    await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(staging, INFO_FILE_NAME), files.info);
+    await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(staging, TEXT_FILE_NAME), files.text);
+    for (const asset of files.assets) {
+      await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(assets, asset.name), asset.data);
+    }
+    await vscode.workspace.fs.rename(staging, target, { overwrite: true });
+  } catch (error) {
+    await Promise.resolve(vscode.workspace.fs.delete(staging, { recursive: true, useTrash: false })).catch(() => undefined);
+    throw error;
+  }
+  const reveal = 'Reveal';
+  const choice = await vscode.window.showInformationMessage(`md: exported ${title}${BUNDLE_EXTENSION}`, reveal);
+  if (choice === reveal) await vscode.commands.executeCommand('revealFileInOS', target);
+  untitledImageNote(document);
+}
+
+/** Say once, after the export, why an untitled document's local images were not bundled. */
+function untitledImageNote(document: vscode.TextDocument): void {
+  if (!document.isUntitled) return;
+  const local = [...document.getText().matchAll(/!\[[^\]]*\]\(([^)\s]+)/g)].filter((m) => isLocalRelativeReference(m[1]));
+  if (local.length === 0) return;
+  void vscode.window.showInformationMessage(
+    'md: this document is not saved yet, so it has no folder to find its local images in — they stay as written. Save it first to bundle them.',
+  );
+}
+
+/**
+ * The bare diagram a document is by its language: a `.gv` file the editor
+ * opened as Graphviz is drawn as one even when its text alone would not say so
+ * (a DOT file that opens with a `#` line). Everything else — PlantUML, whose
+ * `.iuml` fragments are not diagrams, and Markdown — is read from the text, as
+ * before. See `rawDiagramKind`.
+ */
+function knownDiagram(document: vscode.TextDocument): RawDiagram | undefined {
+  return rawDiagramKind('', document.languageId) ?? undefined;
 }
 
 // MARK: - HTML  (ship order 3 — capture plus KaTeX inlining)
@@ -153,7 +308,7 @@ export async function htmlBytes(
   quiet = false,
 ): Promise<Uint8Array> {
   const title = baseName(document);
-  const input = exportDocumentHTML(document.getText(), title);
+  const input = exportDocumentHTML(document.getText(), title, knownDiagram(document));
   const captured = await withRenderHost(
     input,
     title,
@@ -193,7 +348,7 @@ export async function epubBytes(
 ): Promise<Uint8Array> {
   const source = document.getText();
   const title = documentTitle(frontMatter(source), baseName(document));
-  const html = renderDocument(source, { title, dark: false, export: true });
+  const html = renderDocument(source, { title, dark: false, export: true, diagram: knownDiagram(document) });
   let body = bodyContent(html);
   const ranges = richElementRanges(body);
   const images: EpubImage[] = [];
@@ -219,13 +374,69 @@ export async function epubBytes(
     body = applyImageReplacements(body, ranges, replacements);
   }
 
+  const fields = frontMatter(source);
   return packDocumentEpub({
     title,
     body: xhtml(body),
     images,
-    outline: outline(source),
+    outline: epubOutline(source, knownDiagram(document)),
     modified: modifiedNow(),
+    metadata: epubMetadata(fields),
+    cover: await readCover(document, fieldValue(fields, 'cover')),
   });
+}
+
+/** Redirects a cover fetch will follow before giving up. */
+const MAX_REDIRECTS = 5;
+
+/**
+ * GET `url` and every redirect after it over https only: redirects are
+ * followed by hand, so a `Location` that leaves https is refused before any
+ * request is made to it — `redirect: 'follow'` would show only the final URL,
+ * after an insecure hop had already happened. 15 seconds in all, and a body
+ * larger than the cover limit is not read. Null on any failure.
+ */
+export async function fetchHttps(url: string, fetcher: typeof fetch = fetch): Promise<Uint8Array | null> {
+  const signal = AbortSignal.timeout(15_000);
+  let current = url;
+  try {
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      if (!/^https:\/\//i.test(current)) return null;
+      const response = await fetcher(current, { signal, redirect: 'manual' });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (location === null) return null;
+        current = new URL(location, current).toString();
+        continue;
+      }
+      if (!response.ok) return null;
+      if (Number(response.headers.get('content-length') ?? '0') > MAX_COVER_BYTES) return null;
+      return new Uint8Array(await response.arrayBuffer());
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The front matter's `cover:` image, when it can be read and is a PNG, JPEG,
+ * GIF or WebP; otherwise null and the book has no cover — silently, as in every
+ * md app. A `data:` image is decoded, an `https:` one fetched (15 seconds, 20
+ * MB at most), and a relative path read from beside the document with the
+ * TextBundle export's containment.
+ */
+async function readCover(document: vscode.TextDocument, value: string | null): Promise<EpubCover | null> {
+  const reference = coverReference(value);
+  if (reference === null) return null;
+  switch (reference.kind) {
+    case 'data':
+      return recogniseCover(reference.data);
+    case 'local':
+      return recogniseCover(await readAsset(document, reference.path));
+    case 'https':
+      return recogniseCover(await fetchHttps(reference.url));
+  }
 }
 
 // MARK: - PDF  (ship order 5 — documented non-parity)
@@ -246,7 +457,7 @@ export async function epubBytes(
 export async function exportPdf(document: vscode.TextDocument): Promise<void> {
   const title = baseName(document);
   const size = pageSizeNamed(readConfig(document.uri).pageSize);
-  const html = pdfDocumentHTML(document.getText(), title, size);
+  const html = pdfDocumentHTML(document.getText(), title, size, knownDiagram(document));
 
   try {
     await vscode.window.withProgress(

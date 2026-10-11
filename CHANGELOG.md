@@ -14,12 +14,69 @@ its own.
 
 This extension began at its own 1.0 rather than as a continuation of the
 apps' 1.3 line, and this file has said since that release that it would
-join the family's number at the next family one. It has. The section
-below is **1.5**, the number the iPhone, iPad, Mac, Windows and Android
+join the family's number at the next family one. It has. The **1.5**
+section below is the number the iPhone, iPad, Mac, Windows and Android
 apps all carry from this date, and it follows 1.2 directly: nothing is
 missing between the two, because the number is the family's rather than
 this extension's own count, and this extension has simply stepped into
 it.
+
+## [1.6.0] — 2026-10-11
+
+### Added
+
+- **md works in Restricted Mode.** A folder you have not trusted used to
+  get the plain built-in preview and a "some extensions are disabled"
+  banner, because md declared no support for untrusted workspaces — VS
+  Code's default for an extension with code. It now declares limited
+  support: it runs nothing the folder supplies and writes nothing unless
+  you export, and in Restricted Mode `md.preview.bodyFont` and
+  `md.preview.codeFont` are read from your user settings only. Support
+  for virtual workspaces such as GitHub Repositories, which VS Code
+  already assumed, is now declared explicitly as well. (#1)
+- **Words and characters in the status bar.** "211 words · 1,425
+  characters" while a Markdown editor is active — the footer every md app
+  carries, counted the same way (ICU word segments, user-perceived
+  characters), and checked against md for iPhone on the bundled examples.
+  With a selection it reads "12 of 211 words · 70 of 1,425 characters";
+  its tooltip gives a reading time. `md.statusBar.wordCount` turns it off.
+  (#2)
+- **Go to Heading… and Go to Note….** The apps' Contents and Notes menus,
+  as two QuickPicks: md's own outline — so a heading md does not draw is
+  not offered — and every private author note (`<!-- note: … -->`) with
+  its line. The editor follows the highlighted row and Escape puts it back,
+  as in Go to Symbol. Nothing in VS Code listed the notes before. (#3)
+- **A PlantUML or Graphviz file exports as PDF, HTML and EPUB.** The Export
+  submenu, the palette and a multi-file batch now take a bare `.puml` or
+  `.gv` file as well as Markdown, and draw it as the one diagram it is.
+  LaTeX stays Markdown-only, in a menu and in a batch. A diagram file's
+  EPUB lists the whole document as its one contents entry — a DOT `#` line
+  inside the graph is no longer mistaken for a heading. (#4)
+- **Mermaid files have a diagram panel.** A `.mmd` or `.mermaid` file
+  opens as Mermaid (comments with `%%`) and gets **Preview Diagram** — the
+  same panel as PlantUML and Graphviz files, with its zoom — and **Export
+  Diagram as SVG**. md knows a Mermaid file by its extension and never
+  guesses from the text, so a Markdown paragraph that begins "graph" or
+  "flowchart" stays a paragraph. (#5)
+- **Export as TextBundle… and Export as TextPack….** The sixth export
+  every md app already has: `text.md`, the canonical `info.json`, and an
+  `assets/` folder holding each image the document refers to by a
+  relative path, its reference rewritten to `assets/…` — so Bear, Ulysses
+  or another md app opens the document with its pictures. Remote and
+  `data:` images stay as written and nothing is fetched; an image outside
+  the document's folder, by `../` or by a symlink, is left as written
+  rather than copied. TextPack (the bundle zipped) also goes in a
+  multi-file batch. Both are byte-compatible with md for iPhone, Mac,
+  Windows and Android, held to md for Windows's own test vectors. (#6)
+- **An EPUB carries its author, language, date, description, series and
+  cover.** They come from the front matter — `author`, `language`,
+  `date`, `description`, `series` and `series_index`, matched as `title`
+  is — instead of the fixed `en` and nothing else every md EPUB carried.
+  A language that is not a tag stays `en`; a date that is not a W3C date
+  is left out. `cover:` puts an image on the book when it can be read — a
+  file beside the document, an `https:` image or a `data:` image, in PNG,
+  JPEG, GIF or WebP — and is skipped silently otherwise. All five md EPUB
+  writers change together and write the same lines. (#7)
 
 ## [1.5.3] — 2026-10-09
 

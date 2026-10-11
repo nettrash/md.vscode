@@ -161,7 +161,7 @@ code).
   highlight.js 11.11.1 — and nothing is fetched, phoned home or checked
   for. The one thing that can still reach the network is an image **your
   own document names** by URL, which the preview loads exactly as a
-  browser would.
+  browser would, or that an EPUB's front matter names as its `cover:`.
 - **Typewriter feel.** The apps' paper palette — light "fresh paper",
   dark "carbon paper" — following the editor's own light or dark theme,
   American Typewriter where the system has it and Georgia where it does
@@ -184,7 +184,8 @@ code).
   sets a formula as HTML and text and there is no vector to hand over.
 - **The exports are where the files are.** Every one of them is on the
   right-click menu now as well as in the Command Palette: **md: Export**
-  opens as a submenu with *HTML*, *PDF*, *EPUB* and *LaTeX* under it —
+  opens as a submenu with *HTML*, *PDF*, *EPUB*, *LaTeX*, *TextBundle*
+  and *TextPack* under it —
   on a Markdown file in the Explorer, in the editor itself, and on the
   editor tab — with *Export Diagram as SVG…* and *Preview Diagram*
   beside it on a `.puml` or `.gv` file. A menu hands the command the
@@ -192,7 +193,7 @@ code).
   of whatever editor happened to be focused, and of the unsaved text
   when the file is open, which is what you are looking at.
 - **A folder of Markdown, exported in one go.** Select several Markdown
-  files in the Explorer, right-click, and *HTML*, *EPUB* or *LaTeX*
+  files in the Explorer, right-click, and *HTML*, *EPUB*, *LaTeX* or *TextPack*
   exports all of them: one question — which folder — then one
   cancellable progress notification counting through the files, and one
   line at the end saying how many landed, naming any that did not and

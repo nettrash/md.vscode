@@ -22,7 +22,8 @@ telemetry. It registers no telemetry channel with the editor, calls no
 reporting API, and contacts no servers of ours — there are none. The one
 time the extension touches the network at all is when a document you
 opened points at an image by remote URL, and the preview fetches that
-image so it can be shown (see **Permissions** below).
+image so it can be shown — or, when you export an EPUB, its front matter
+names its cover by an `https:` URL (see **Permissions** below).
 
 Visual Studio Code itself is another matter, and it would be dishonest to
 let the sentence above stand for the whole editor. VS Code collects its
@@ -41,9 +42,16 @@ md is a renderer, not a filing system. The files you open, edit and save
 are handled entirely by VS Code — its editors, its workspace, its save
 dialogs — and are stored wherever you choose. We never see them. The
 extension reads the document you are previewing and writes only the file
-you name when you ask for an export. It is disabled in a folder you have
-not trusted, because it declares no support for untrusted workspaces and
-that restricted default is the right one to leave alone.
+or bundle you name when you ask for an export. A TextBundle or TextPack
+export also reads the images your document refers to by a relative path,
+from the document's own folder only, and copies them into what it
+writes. It also works in a folder you have
+not trusted (Restricted Mode) and in a virtual workspace such as GitHub
+Repositories, because nothing in it runs anything the folder supplies: it
+draws the text VS Code hands it with engines carried inside the
+extension. In Restricted Mode its two font settings,
+`md.preview.bodyFont` and `md.preview.codeFont`, are read from your user
+settings only — a folder you have not trusted cannot set them.
 
 It also reads the Markdown document you are **editing**, to point out
 where md's deliberate subset of Markdown renders differently from
@@ -62,9 +70,10 @@ you at any time. They are, in full: which palette the preview draws in
 `md.preview.codeFont`), whether each engine is enabled
 (`md.math.enabled`, `md.diagrams.mermaid`, `md.diagrams.graphviz`,
 `md.diagrams.plantuml`, `md.diagrams.plot`, `md.highlight.enabled`), the
-page size used for PDF export (`md.export.pageSize`) and whether the
+page size used for PDF export (`md.export.pageSize`), whether the
 Markdown-dialect lint runs and which of its rules (`md.lint.dialect`,
-`md.lint.rules`). Beyond those the extension stores nothing at all: no
+`md.lint.rules`), and whether the status bar shows the word count
+(`md.statusBar.wordCount`). Beyond those the extension stores nothing at all: no
 database, no cache, no recent-documents list, and nothing in VS Code's
 global or workspace state. None of it leaves your machine, and none of it
 contains personal information. If a future version remembers anything
@@ -97,7 +106,9 @@ document you open references an image by remote URL (`![alt](https://…)`),
 the preview fetches that image so it can be shown. That request goes
 straight to the host **your own document names**, which sees your IP
 address exactly as it would if you opened the link in a browser. It
-happens only for documents that contain such a link.
+happens only for documents that contain such a link. The same goes for an
+EPUB export whose front matter says `cover: https://…`: the export fetches
+that one image to put it on the book, and nothing else.
 
 Everything else runs on your machine: the Markdown renderer, the maths
 and chemistry typesetting, the syntax highlighting and the diagram

@@ -117,6 +117,10 @@ const { commands, configuration, grammars, languages, menus, submenus } = manife
 /** The diagram panel being the active editor — the zoom commands' one place. */
 const PANEL = "activeWebviewPanelId == 'md.diagramPreview'";
 
+/** The three kinds of document HTML, PDF and EPUB export, by each menu's context key. */
+const RESOURCE_DOCUMENTS = 'resourceLangId == markdown || resourceLangId == plantuml || resourceLangId == graphviz';
+const EDITOR_DOCUMENTS = 'editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz';
+
 /** One menu's rows, or a failure naming the menu rather than `undefined is not iterable`. */
 const menu = (id: string): readonly MenuItem[] => {
   const rows = menus[id];
@@ -145,6 +149,13 @@ const language = (id: string): LanguageContribution => {
 describe('contributes.languages — the file types', () => {
   it('claims the four PlantUML spellings, in the canonical order', () => {
     expect(language('plantuml').extensions).toEqual(['.puml', '.plantuml', '.iuml', '.pu']);
+  });
+
+  it('claims .mmd and .mermaid as Mermaid, with comments and no grammar (#5)', () => {
+    const mermaid = language('mermaid');
+    expect(mermaid.extensions).toEqual(['.mmd', '.mermaid']);
+    expect(existsSync(path.join(ROOT, mermaid.configuration ?? ''))).toBe(true);
+    expect(grammars.filter((grammar) => grammar.language === 'mermaid')).toEqual([]);
   });
 
   it('claims .gv and — here alone in the family — .dot', () => {
@@ -245,18 +256,28 @@ describe('contributes.submenus — the export submenu', () => {
     expect(submenus[0].label.length).toBeGreaterThan(0);
   });
 
-  it('offers the four document exports, in the order the family lists them', () => {
+  it('offers the six document exports, in the order the family lists them', () => {
     expect(commandIds('md.export')).toEqual([
       'md.exportHtml',
       'md.exportPdf',
       'md.exportEpub',
       'md.exportLatex',
+      'md.exportTextBundle',
+      'md.exportTextPack',
     ]);
   });
 
-  it('keeps PDF out of a multi-selection, and nothing else', () => {
+  it('keeps PDF and TextBundle out of a multi-selection and the text formats to Markdown, and nothing else', () => {
     expect(row('md.export', 'md.exportPdf').when).toBe('!listMultiSelection');
-    for (const id of ['md.exportHtml', 'md.exportEpub', 'md.exportLatex']) {
+    // From 1.6.0 the submenu also opens on a PlantUML or Graphviz file, which
+    // LaTeX has nothing to say about (#4); nor have TextBundle and TextPack,
+    // which carry a Markdown text (#6).
+    expect(row('md.export', 'md.exportLatex').when).toBe('resourceLangId == markdown');
+    expect(row('md.export', 'md.exportTextPack').when).toBe('resourceLangId == markdown');
+    // A TextBundle is a folder picked per document; many documents go as
+    // TextPacks, one file each, through the batch.
+    expect(row('md.export', 'md.exportTextBundle').when).toBe('resourceLangId == markdown && !listMultiSelection');
+    for (const id of ['md.exportHtml', 'md.exportEpub']) {
       expect(row('md.export', id).when, id).toBeUndefined();
     }
   });
@@ -278,14 +299,14 @@ describe('contributes.menus — where the commands are offered', () => {
     }
   });
 
-  it('shows it for Markdown only, by the key each menu actually sets', () => {
+  it('shows it for Markdown, PlantUML and Graphviz, by the key each menu actually sets', () => {
     // `resourceLangId` is the file the row is about — the one clicked in the
     // explorer, the one on the tab. `editorLangId` is the editor the body
     // context menu belongs to. Using the other key in either place shows the
     // rows for every file type or for none.
-    expect(row('explorer/context', 'md.export').when).toBe('resourceLangId == markdown');
-    expect(row('editor/title/context', 'md.export').when).toBe('resourceLangId == markdown');
-    expect(row('editor/context', 'md.export').when).toBe('editorLangId == markdown');
+    expect(row('explorer/context', 'md.export').when).toBe(RESOURCE_DOCUMENTS);
+    expect(row('editor/title/context', 'md.export').when).toBe(RESOURCE_DOCUMENTS);
+    expect(row('editor/context', 'md.export').when).toBe(EDITOR_DOCUMENTS);
   });
 
   it('offers the two diagram commands for diagram files in all three', () => {
@@ -312,7 +333,7 @@ describe('contributes.menus — where the commands are offered', () => {
     expect(menu('editor/title')).toEqual([
       {
         command: 'md.showDiagramPreview',
-        when: 'editorLangId == plantuml || editorLangId == graphviz',
+        when: 'editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid',
         group: 'navigation',
       },
       // And, from 1.5.3, the diagram panel's own zoom buttons — on the panel's
@@ -325,18 +346,22 @@ describe('contributes.menus — where the commands are offered', () => {
 
   it('still offers every command in the palette, with its own when clause', () => {
     expect(menu('commandPalette')).toEqual([
-      { command: 'md.exportHtml', when: 'editorLangId == markdown' },
-      { command: 'md.exportPdf', when: 'editorLangId == markdown' },
-      { command: 'md.exportEpub', when: 'editorLangId == markdown' },
+      { command: 'md.exportHtml', when: EDITOR_DOCUMENTS },
+      { command: 'md.exportPdf', when: EDITOR_DOCUMENTS },
+      { command: 'md.exportEpub', when: EDITOR_DOCUMENTS },
       { command: 'md.exportLatex', when: 'editorLangId == markdown' },
+      { command: 'md.exportTextBundle', when: 'editorLangId == markdown' },
+      { command: 'md.exportTextPack', when: 'editorLangId == markdown' },
       {
         command: 'md.exportSvg',
-        when: 'editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz',
+        when: 'editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid',
       },
       {
         command: 'md.showDiagramPreview',
-        when: 'editorLangId == plantuml || editorLangId == graphviz',
+        when: 'editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid',
       },
+      { command: 'md.goToHeading', when: 'editorLangId == markdown' },
+      { command: 'md.goToNote', when: 'editorLangId == markdown' },
       { command: 'md.zoomIn', when: PANEL },
       { command: 'md.zoomOut', when: PANEL },
       { command: 'md.zoomReset', when: PANEL },
@@ -372,6 +397,30 @@ describe('contributes.keybindings — zoom, and only in the diagram panel', () =
       expect(command, id).toBeDefined();
       expect(command?.icon, id).toMatch(/^\$\([a-z-]+\)$/);
     }
+  });
+});
+
+describe('capabilities — Restricted Mode and virtual workspaces', () => {
+  const capabilities = (manifest as unknown as {
+    capabilities: {
+      untrustedWorkspaces: { supported: boolean | 'limited'; description?: string; restrictedConfigurations?: string[] };
+      virtualWorkspaces: boolean;
+    };
+  }).capabilities;
+
+  it("supports untrusted workspaces in the 'limited' form, keeping the two font stacks to user settings", () => {
+    expect(capabilities.untrustedWorkspaces.supported).toBe('limited');
+    expect(capabilities.untrustedWorkspaces.description?.length).toBeGreaterThan(0);
+    expect(capabilities.untrustedWorkspaces.restrictedConfigurations).toEqual(['md.preview.bodyFont', 'md.preview.codeFont']);
+  });
+
+  it('restricts only settings it declares', () => {
+    const declared = Object.keys((configuration as { properties: Record<string, unknown> }).properties);
+    for (const key of capabilities.untrustedWorkspaces.restrictedConfigurations ?? []) expect(declared).toContain(key);
+  });
+
+  it('supports virtual workspaces', () => {
+    expect(capabilities.virtualWorkspaces).toBe(true);
   });
 });
 

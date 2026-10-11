@@ -33,6 +33,7 @@ import {
   sanitized,
   stemOfPath,
 } from '../src/export/batch';
+import { epubOutline } from '../src/export/epub';
 
 describe('stemOfPath — the name an export takes', () => {
   it('drops the directory and the extension', () => {
@@ -148,5 +149,13 @@ describe('isMarkdownPath — what a multi-selection is filtered to', () => {
     for (const p of ['/notes', '/notes/', '/notes/photo.png', '/notes/a.txt', '/notes/d.puml']) {
       expect(isMarkdownPath(p), p).toBe(false);
     }
+  });
+});
+
+describe('epubOutline — the contents of a bare diagram file (#4)', () => {
+  it('lists no headings for a PlantUML or Graphviz file, not even a DOT `#` line inside the graph', () => {
+    expect(epubOutline('@startuml\nA -> B\n@enduml\n')).toEqual([]);
+    expect(epubOutline('digraph {\n# a preprocessor line\n  a -> b\n}\n')).toEqual([]);
+    expect(epubOutline('# Title\n\nText\n').map((entry) => entry.text)).toEqual(['Title']);
   });
 });

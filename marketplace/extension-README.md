@@ -15,7 +15,7 @@ READMEs. Formulas and chemical equations, charts drawn from the function
 you write, Mermaid flowcharts, Graphviz graphs, PlantUML drawings, data
 pasted straight out of a spreadsheet, footnotes, front matter and
 highlighted code all render as you type, and the finished document exports
-to HTML, PDF, EPUB, LaTeX or SVG.
+to HTML, PDF, EPUB, LaTeX, TextBundle, TextPack or SVG.
 
 The first thing worth knowing: it **extends VS Code's built-in Markdown
 preview** rather than opening a window of its own. *Open Preview*
@@ -160,6 +160,13 @@ YAML or TOML front matter at the very top of a file — `---` … `---` or
 from every export, instead of surfacing as a horizontal rule followed by
 stray text.
 
+An EPUB reads it as the book's metadata: `title`, `author`, `language`
+(a tag such as `en` or `pt-BR`), `date` (`2026-10-10`), `description`,
+and `series` with `series_index` reach the reader's library, and `cover`
+names the cover image — a file beside the document, an `https:` image or
+a `data:` image, in PNG, JPEG, GIF or WebP. A cover that cannot be read
+is left out and the book is written without one.
+
 ### Footnotes
 
 Write `[^id]` in the text and `[^id]: the note` on a line of its own. The
@@ -191,7 +198,9 @@ A `.puml`, `.plantuml`, `.iuml` or `.pu` file, and a `.gv` or `.dot` one,
 opens as its own language with syntax highlighting and a **Preview
 Diagram** button in the editor title bar. The panel beside it shows the
 diagram the file describes and follows every edit, while the source stays
-fully editable.
+fully editable. A Mermaid file — `.mmd` or `.mermaid` — gets the same
+button and panel, and **Export Diagram as SVG**; it is known by its
+extension, never guessed from its text.
 
 Markdown files stay VS Code's own. The built-in `markdown` language opens
 `.md`, `.markdown`, `.mdown`, `.markdn`, `.mdtext`, `.mdtxt`, `.mkd` and
@@ -213,8 +222,11 @@ and a chart travels into that book as vector, while a diagram arrives as a
 picture. *Export as LaTeX…* writes `.tex` in which your mathematics is still
 the `$…$` you typed rather than a picture of it; a diagram or a chart
 travels as the source you wrote, under a comment naming its language.
-*Export Diagram as SVG…* saves one diagram, or one chart, as a real vector
-file.
+*Export as TextBundle…* and *Export as TextPack…* write the format Bear,
+Ulysses and every md app share: the text with an `assets/` folder holding
+each image the document refers to by a relative path, so it arrives with
+its pictures. *Export Diagram as SVG…* saves one diagram, or one chart, as
+a real vector file.
 
 All of them are on the right-click menu as well as in the Command
 Palette: **md: Export** opens as a submenu on a Markdown file in the
@@ -226,8 +238,8 @@ the file is open.
 
 ### A folder of Markdown at once
 
-Select several Markdown files in the Explorer and *HTML*, *EPUB* or
-*LaTeX* exports all of them: one question — which folder — then a
+Select several Markdown files in the Explorer and *HTML*, *EPUB*,
+*LaTeX* or *TextPack* exports all of them: one question — which folder — then a
 cancellable progress notification counting through the files, and one
 line at the end saying how many landed, naming any that failed and any
 non-Markdown file that was skipped. Each export takes its own source
@@ -276,12 +288,15 @@ the context menus below.
 
 | Command | What it does | Offered when |
 | --- | --- | --- |
-| **md: Export as HTML…** | One self-contained `.html` file, engines and fonts included | a Markdown editor is active, or Markdown files are selected — in batch too |
-| **md: Export as PDF…** | The rendered document as a PDF, at the size in `md.export.pageSize` | a Markdown editor is active, or one Markdown file is selected |
-| **md: Export as EPUB…** | An e-book with the document's headings as its contents | a Markdown editor is active, or Markdown files are selected — in batch too |
+| **md: Export as HTML…** | One self-contained `.html` file, engines and fonts included | a Markdown, PlantUML or Graphviz editor is active, or such files are selected — in batch too |
+| **md: Export as PDF…** | The rendered document as a PDF, at the size in `md.export.pageSize` | a Markdown, PlantUML or Graphviz editor is active, or one such file is selected |
+| **md: Export as EPUB…** | An e-book with the document's headings as its contents | a Markdown, PlantUML or Graphviz editor is active, or such files are selected — in batch too |
 | **md: Export as LaTeX…** | `.tex` source, mathematics kept as mathematics | a Markdown editor is active, or Markdown files are selected — in batch too |
-| **md: Export Diagram as SVG…** | One Mermaid, Graphviz or PlantUML diagram, or one chart, as a vector file | a Markdown, PlantUML or Graphviz editor is active, or one diagram file is selected |
-| **md: Preview Diagram** | Opens the diagram panel beside a diagram file | a PlantUML or Graphviz editor is active, or one diagram file is selected |
+| **md: Export as TextBundle…** | A `.textbundle` folder: `text.md`, `info.json` and the document's local images in `assets/` | a Markdown editor is active, or one Markdown file is selected |
+| **md: Export as TextPack…** | The same bundle zipped into one `.textpack` file | a Markdown editor is active, or Markdown files are selected — in batch too |
+| **md: Export Diagram as SVG…** | One Mermaid, Graphviz or PlantUML diagram, or one chart, as a vector file | a Markdown, PlantUML, Graphviz or Mermaid editor is active, or one diagram file is selected |
+| **md: Preview Diagram** | Opens the diagram panel beside a diagram file | a PlantUML, Graphviz or Mermaid editor is active, or one diagram file is selected |
+| **md: Go to Heading…** / **Go to Note…** | Jump to a heading, or to one of the document's private notes, from a list that follows as you move through it | a Markdown editor is active |
 | **md: Zoom In** / **Zoom Out** / **Reset Zoom** | Zoom the diagram in the diagram panel; Reset fits it to the panel again (Ctrl / ⌘ +, −, 0) | the diagram panel is the active editor |
 
 Mathematics is not on the SVG list, because KaTeX sets a formula as HTML
@@ -304,6 +319,7 @@ workspace or for one folder.
 | `md.diagrams.plot` | `true` | Draw ` ```plot ` blocks as charts |
 | `md.highlight.enabled` | `true` | Syntax-highlight fenced code blocks that name a language |
 | `md.export.pageSize` | `A4` | Page size for PDF export: `A4`, `A5`, `Letter`, `Legal`, `6x9`, `5x8`, `5.5x8.5` |
+| `md.statusBar.wordCount` | `true` | The document's words and characters in the status bar while a Markdown editor is active, counted as the md apps count them; the selection's too when there is one |
 | `md.lint.dialect` | `true` | Point out, at Information level, where md's Markdown differs from GitHub's |
 | `md.lint.rules` | *(all on)* | Which of the five differences are reported: `rawHtml`, `referenceLink`, `indentedCode`, `tableAfterParagraph`, `footnote` |
 
@@ -337,7 +353,8 @@ extension. md has no account, no telemetry and no servers of ours to send
 anything to. It reads the document you are previewing and writes only the
 file you name when you ask for an export. The single thing that can reach
 the network is an image **your own document names** by URL, which the
-preview fetches so it can show it, exactly as a browser would. Visual
+preview fetches so it can show it, exactly as a browser would — or that
+an EPUB's front matter names as its `cover:`. Visual
 Studio Code's own telemetry is the editor's, governed by your
 `telemetry.telemetryLevel` and by Microsoft's privacy statement. This
 extension adds nothing to it and reads nothing from it. The full policy is
@@ -350,8 +367,9 @@ in [PRIVACY.md](PRIVACY.md).
   in the extension host and read their files from disk, which the browser
   extension host cannot do, so there is no `vscode.dev` build rather than
   one that silently renders half a document.
-- A trusted workspace. The extension declares no support for untrusted
-  ones and leaves that restricted default alone.
+- Any workspace: trusted, Restricted Mode, or virtual (GitHub
+  Repositories and the like). In Restricted Mode the two font settings
+  come from your user settings only.
 
 ## Known limitations
 

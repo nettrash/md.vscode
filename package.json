@@ -2,7 +2,7 @@
   "name": "md-vscode",
   "displayName": "md",
   "description": "Markdown preview with math, chemistry, charts and diagrams: KaTeX, Mermaid, Graphviz, PlantUML and a built-in plotter, all on-device with nothing sent anywhere. Exports to HTML, PDF, EPUB, LaTeX and SVG.",
-  "version": "1.5.3",
+  "version": "1.6.0",
   "publisher": "nettrash",
   "license": "MIT",
   "author": {
@@ -47,6 +47,17 @@
     "vscode": "^1.95.0"
   },
   "main": "./dist/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "md renders the document VS Code hands it and writes nothing unless you export. In Restricted Mode the two font settings are read from your user settings only, never from the workspace.",
+      "restrictedConfigurations": [
+        "md.preview.bodyFont",
+        "md.preview.codeFont"
+      ]
+    },
+    "virtualWorkspaces": true
+  },
   "contributes": {
     "markdown.markdownItPlugins": true,
     "markdown.previewScripts": [
@@ -90,6 +101,18 @@
           ".dot"
         ],
         "configuration": "./language/graphviz.language-configuration.json"
+      },
+      {
+        "id": "mermaid",
+        "aliases": [
+          "Mermaid",
+          "mermaid"
+        ],
+        "extensions": [
+          ".mmd",
+          ".mermaid"
+        ],
+        "configuration": "./language/mermaid.language-configuration.json"
       }
     ],
     "grammars": [
@@ -139,6 +162,16 @@
         "category": "md"
       },
       {
+        "command": "md.exportTextBundle",
+        "title": "Export as TextBundle…",
+        "category": "md"
+      },
+      {
+        "command": "md.exportTextPack",
+        "title": "Export as TextPack…",
+        "category": "md"
+      },
+      {
         "command": "md.exportSvg",
         "title": "Export Diagram as SVG…",
         "category": "md"
@@ -146,6 +179,16 @@
       {
         "command": "md.showDiagramPreview",
         "title": "Preview Diagram",
+        "category": "md"
+      },
+      {
+        "command": "md.goToHeading",
+        "title": "Go to Heading…",
+        "category": "md"
+      },
+      {
+        "command": "md.goToNote",
+        "title": "Go to Note…",
         "category": "md"
       },
       {
@@ -190,84 +233,111 @@
         },
         {
           "command": "md.exportLatex",
-          "group": "md@4"
+          "group": "md@4",
+          "when": "resourceLangId == markdown"
+        },
+        {
+          "command": "md.exportTextBundle",
+          "group": "md@5",
+          "when": "resourceLangId == markdown && !listMultiSelection"
+        },
+        {
+          "command": "md.exportTextPack",
+          "group": "md@6",
+          "when": "resourceLangId == markdown"
         }
       ],
       "explorer/context": [
         {
           "submenu": "md.export",
-          "when": "resourceLangId == markdown",
+          "when": "resourceLangId == markdown || resourceLangId == plantuml || resourceLangId == graphviz",
           "group": "md@1"
         },
         {
           "command": "md.exportSvg",
-          "when": "(resourceLangId == plantuml || resourceLangId == graphviz) && !listMultiSelection",
+          "when": "(resourceLangId == plantuml || resourceLangId == graphviz || resourceLangId == mermaid) && !listMultiSelection",
           "group": "md@2"
         },
         {
           "command": "md.showDiagramPreview",
-          "when": "(resourceLangId == plantuml || resourceLangId == graphviz) && !listMultiSelection",
+          "when": "(resourceLangId == plantuml || resourceLangId == graphviz || resourceLangId == mermaid) && !listMultiSelection",
           "group": "md@3"
         }
       ],
       "editor/context": [
         {
           "submenu": "md.export",
-          "when": "editorLangId == markdown",
+          "when": "editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz",
           "group": "md@1"
         },
         {
           "command": "md.exportSvg",
-          "when": "editorLangId == plantuml || editorLangId == graphviz",
+          "when": "editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid",
           "group": "md@2"
         },
         {
           "command": "md.showDiagramPreview",
-          "when": "editorLangId == plantuml || editorLangId == graphviz",
+          "when": "editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid",
           "group": "md@3"
         }
       ],
       "editor/title/context": [
         {
           "submenu": "md.export",
-          "when": "resourceLangId == markdown",
+          "when": "resourceLangId == markdown || resourceLangId == plantuml || resourceLangId == graphviz",
           "group": "md@1"
         },
         {
           "command": "md.exportSvg",
-          "when": "resourceLangId == plantuml || resourceLangId == graphviz",
+          "when": "resourceLangId == plantuml || resourceLangId == graphviz || resourceLangId == mermaid",
           "group": "md@2"
         },
         {
           "command": "md.showDiagramPreview",
-          "when": "resourceLangId == plantuml || resourceLangId == graphviz",
+          "when": "resourceLangId == plantuml || resourceLangId == graphviz || resourceLangId == mermaid",
           "group": "md@3"
         }
       ],
       "commandPalette": [
         {
           "command": "md.exportHtml",
-          "when": "editorLangId == markdown"
+          "when": "editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz"
         },
         {
           "command": "md.exportPdf",
-          "when": "editorLangId == markdown"
+          "when": "editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz"
         },
         {
           "command": "md.exportEpub",
-          "when": "editorLangId == markdown"
+          "when": "editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz"
         },
         {
           "command": "md.exportLatex",
           "when": "editorLangId == markdown"
         },
         {
+          "command": "md.exportTextBundle",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "md.exportTextPack",
+          "when": "editorLangId == markdown"
+        },
+        {
           "command": "md.exportSvg",
-          "when": "editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz"
+          "when": "editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid"
         },
         {
           "command": "md.showDiagramPreview",
-          "when": "editorLangId == plantuml || editorLangId == graphviz"
+          "when": "editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid"
+        },
+        {
+          "command": "md.goToHeading",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "md.goToNote",
+          "when": "editorLangId == markdown"
         },
         {
           "command": "md.zoomIn",
@@ -285,7 +355,7 @@
       "editor/title": [
         {
           "command": "md.showDiagramPreview",
-          "when": "editorLangId == plantuml || editorLangId == graphviz",
+          "when": "editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid",
           "group": "navigation"
         },
         {
@@ -423,6 +493,12 @@
           "description": "Page size for PDF export and print, including the print-on-demand trim sizes.",
           "scope": "resource"
         },
+        "md.statusBar.wordCount": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show the document's words and characters in the status bar while a Markdown editor is active — counted as the md apps count them, and the selection's too when there is one.",
+          "scope": "resource"
+        },
         "md.lint.dialect": {
           "type": "boolean",
           "default": true,
@@ -475,7 +551,8 @@
   "activationEvents": [
     "onLanguage:markdown",
     "onLanguage:plantuml",
-    "onLanguage:graphviz"
+    "onLanguage:graphviz",
+    "onLanguage:mermaid"
   ],
   "scripts": {
     "compile": "node esbuild.mjs",
