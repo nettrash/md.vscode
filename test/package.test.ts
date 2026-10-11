@@ -151,6 +151,13 @@ describe('contributes.languages — the file types', () => {
     expect(language('plantuml').extensions).toEqual(['.puml', '.plantuml', '.iuml', '.pu']);
   });
 
+  it('claims .mmd and .mermaid as Mermaid, with comments and no grammar (#5)', () => {
+    const mermaid = language('mermaid');
+    expect(mermaid.extensions).toEqual(['.mmd', '.mermaid']);
+    expect(existsSync(path.join(ROOT, mermaid.configuration ?? ''))).toBe(true);
+    expect(grammars.filter((grammar) => grammar.language === 'mermaid')).toEqual([]);
+  });
+
   it('claims .gv and — here alone in the family — .dot', () => {
     expect(language('graphviz').extensions).toEqual(['.gv', '.dot']);
   });
@@ -319,7 +326,7 @@ describe('contributes.menus — where the commands are offered', () => {
     expect(menu('editor/title')).toEqual([
       {
         command: 'md.showDiagramPreview',
-        when: 'editorLangId == plantuml || editorLangId == graphviz',
+        when: 'editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid',
         group: 'navigation',
       },
       // And, from 1.5.3, the diagram panel's own zoom buttons — on the panel's
@@ -338,11 +345,11 @@ describe('contributes.menus — where the commands are offered', () => {
       { command: 'md.exportLatex', when: 'editorLangId == markdown' },
       {
         command: 'md.exportSvg',
-        when: 'editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz',
+        when: 'editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid',
       },
       {
         command: 'md.showDiagramPreview',
-        when: 'editorLangId == plantuml || editorLangId == graphviz',
+        when: 'editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid',
       },
       { command: 'md.goToHeading', when: 'editorLangId == markdown' },
       { command: 'md.goToNote', when: 'editorLangId == markdown' },

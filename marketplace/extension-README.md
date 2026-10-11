@@ -191,7 +191,9 @@ A `.puml`, `.plantuml`, `.iuml` or `.pu` file, and a `.gv` or `.dot` one,
 opens as its own language with syntax highlighting and a **Preview
 Diagram** button in the editor title bar. The panel beside it shows the
 diagram the file describes and follows every edit, while the source stays
-fully editable.
+fully editable. A Mermaid file — `.mmd` or `.mermaid` — gets the same
+button and panel, and **Export Diagram as SVG**; it is known by its
+extension, never guessed from its text.
 
 Markdown files stay VS Code's own. The built-in `markdown` language opens
 `.md`, `.markdown`, `.mdown`, `.markdn`, `.mdtext`, `.mdtxt`, `.mkd` and
@@ -280,8 +282,8 @@ the context menus below.
 | **md: Export as PDF…** | The rendered document as a PDF, at the size in `md.export.pageSize` | a Markdown, PlantUML or Graphviz editor is active, or one such file is selected |
 | **md: Export as EPUB…** | An e-book with the document's headings as its contents | a Markdown, PlantUML or Graphviz editor is active, or such files are selected — in batch too |
 | **md: Export as LaTeX…** | `.tex` source, mathematics kept as mathematics | a Markdown editor is active, or Markdown files are selected — in batch too |
-| **md: Export Diagram as SVG…** | One Mermaid, Graphviz or PlantUML diagram, or one chart, as a vector file | a Markdown, PlantUML or Graphviz editor is active, or one diagram file is selected |
-| **md: Preview Diagram** | Opens the diagram panel beside a diagram file | a PlantUML or Graphviz editor is active, or one diagram file is selected |
+| **md: Export Diagram as SVG…** | One Mermaid, Graphviz or PlantUML diagram, or one chart, as a vector file | a Markdown, PlantUML, Graphviz or Mermaid editor is active, or one diagram file is selected |
+| **md: Preview Diagram** | Opens the diagram panel beside a diagram file | a PlantUML, Graphviz or Mermaid editor is active, or one diagram file is selected |
 | **md: Go to Heading…** / **Go to Note…** | Jump to a heading, or to one of the document's private notes, from a list that follows as you move through it | a Markdown editor is active |
 | **md: Zoom In** / **Zoom Out** / **Reset Zoom** | Zoom the diagram in the diagram panel; Reset fits it to the panel again (Ctrl / ⌘ +, −, 0) | the diagram panel is the active editor |
 
