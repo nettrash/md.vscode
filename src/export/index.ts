@@ -46,6 +46,7 @@ import {
 } from './textbundle';
 import { archive } from './zip';
 import { isInside, readLocalAsset } from './asset-reader';
+import { coverReference, epubMetadata, fieldValue, MAX_COVER_BYTES, recogniseCover, type EpubCover } from './epub-metadata';
 import { readConfig } from '../preview/config';
 import { openDiagramPreview } from '../preview/diagramPreview';
 
@@ -373,13 +374,69 @@ export async function epubBytes(
     body = applyImageReplacements(body, ranges, replacements);
   }
 
+  const fields = frontMatter(source);
   return packDocumentEpub({
     title,
     body: xhtml(body),
     images,
     outline: epubOutline(source, knownDiagram(document)),
     modified: modifiedNow(),
+    metadata: epubMetadata(fields),
+    cover: await readCover(document, fieldValue(fields, 'cover')),
   });
+}
+
+/** Redirects a cover fetch will follow before giving up. */
+const MAX_REDIRECTS = 5;
+
+/**
+ * GET `url` and every redirect after it over https only: redirects are
+ * followed by hand, so a `Location` that leaves https is refused before any
+ * request is made to it — `redirect: 'follow'` would show only the final URL,
+ * after an insecure hop had already happened. 15 seconds in all, and a body
+ * larger than the cover limit is not read. Null on any failure.
+ */
+export async function fetchHttps(url: string, fetcher: typeof fetch = fetch): Promise<Uint8Array | null> {
+  const signal = AbortSignal.timeout(15_000);
+  let current = url;
+  try {
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      if (!/^https:\/\//i.test(current)) return null;
+      const response = await fetcher(current, { signal, redirect: 'manual' });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (location === null) return null;
+        current = new URL(location, current).toString();
+        continue;
+      }
+      if (!response.ok) return null;
+      if (Number(response.headers.get('content-length') ?? '0') > MAX_COVER_BYTES) return null;
+      return new Uint8Array(await response.arrayBuffer());
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The front matter's `cover:` image, when it can be read and is a PNG, JPEG,
+ * GIF or WebP; otherwise null and the book has no cover — silently, as in every
+ * md app. A `data:` image is decoded, an `https:` one fetched (15 seconds, 20
+ * MB at most), and a relative path read from beside the document with the
+ * TextBundle export's containment.
+ */
+async function readCover(document: vscode.TextDocument, value: string | null): Promise<EpubCover | null> {
+  const reference = coverReference(value);
+  if (reference === null) return null;
+  switch (reference.kind) {
+    case 'data':
+      return recogniseCover(reference.data);
+    case 'local':
+      return recogniseCover(await readAsset(document, reference.path));
+    case 'https':
+      return recogniseCover(await fetchHttps(reference.url));
+  }
 }
 
 // MARK: - PDF  (ship order 5 — documented non-parity)

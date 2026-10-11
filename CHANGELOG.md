@@ -68,6 +68,15 @@ it.
   rather than copied. TextPack (the bundle zipped) also goes in a
   multi-file batch. Both are byte-compatible with md for iPhone, Mac,
   Windows and Android, held to md for Windows's own test vectors. (#6)
+- **An EPUB carries its author, language, date, description, series and
+  cover.** They come from the front matter — `author`, `language`,
+  `date`, `description`, `series` and `series_index`, matched as `title`
+  is — instead of the fixed `en` and nothing else every md EPUB carried.
+  A language that is not a tag stays `en`; a date that is not a W3C date
+  is left out. `cover:` puts an image on the book when it can be read — a
+  file beside the document, an `https:` image or a `data:` image, in PNG,
+  JPEG, GIF or WebP — and is skipped silently otherwise. All five md EPUB
+  writers change together and write the same lines. (#7)
 
 ## [1.5.3] — 2026-10-09
 
