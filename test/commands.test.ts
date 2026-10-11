@@ -190,6 +190,23 @@ describe('resolveDocument — nothing given', () => {
 //  So the host decides, through the one call the batch had to make anyway.
 //
 describe('batchTargets — the host decides what Markdown is', () => {
+  it('takes diagram files when the format can draw them, and only then (#4)', async () => {
+    const markdown = stubDocument('/notes/trip.md');
+    const puml = stubDocument('/notes/flow.puml', 'plantuml');
+    const gv = stubDocument('/notes/deps.gv', 'graphviz');
+    stubEditors({ documents: [markdown, puml, gv] });
+    const all = [uri('/notes/trip.md'), uri('/notes/flow.puml'), uri('/notes/deps.gv')];
+
+    // HTML and EPUB draw a bare diagram; LaTeX keeps to Markdown.
+    const html = await batchTargets(all, ['markdown', 'plantuml', 'graphviz']);
+    expect(html.targets.map((target) => target.path)).toEqual(['/notes/trip.md', '/notes/flow.puml', '/notes/deps.gv']);
+    expect(html.skipped).toBe(0);
+
+    const latex = await batchTargets(all, ['markdown']);
+    expect(latex.targets.map((target) => target.path)).toEqual(['/notes/trip.md']);
+    expect(latex.skipped).toBe(2);
+  });
+
   it('keeps a spelling the editor calls Markdown and this repo has never heard of', async () => {
     const ronn = stubDocument('/notes/guide.ronn');
     const workbook = stubDocument('/notes/book.workbook');
