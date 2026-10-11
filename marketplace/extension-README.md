@@ -350,8 +350,9 @@ in [PRIVACY.md](PRIVACY.md).
   in the extension host and read their files from disk, which the browser
   extension host cannot do, so there is no `vscode.dev` build rather than
   one that silently renders half a document.
-- A trusted workspace. The extension declares no support for untrusted
-  ones and leaves that restricted default alone.
+- Any workspace: trusted, Restricted Mode, or virtual (GitHub
+  Repositories and the like). In Restricted Mode the two font settings
+  come from your user settings only.
 
 ## Known limitations
 
