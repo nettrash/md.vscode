@@ -22,7 +22,8 @@ telemetry. It registers no telemetry channel with the editor, calls no
 reporting API, and contacts no servers of ours — there are none. The one
 time the extension touches the network at all is when a document you
 opened points at an image by remote URL, and the preview fetches that
-image so it can be shown (see **Permissions** below).
+image so it can be shown — or, when you export an EPUB, its front matter
+names its cover by an `https:` URL (see **Permissions** below).
 
 Visual Studio Code itself is another matter, and it would be dishonest to
 let the sentence above stand for the whole editor. VS Code collects its
@@ -105,7 +106,9 @@ document you open references an image by remote URL (`![alt](https://…)`),
 the preview fetches that image so it can be shown. That request goes
 straight to the host **your own document names**, which sees your IP
 address exactly as it would if you opened the link in a browser. It
-happens only for documents that contain such a link.
+happens only for documents that contain such a link. The same goes for an
+EPUB export whose front matter says `cover: https://…`: the export fetches
+that one image to put it on the book, and nothing else.
 
 Everything else runs on your machine: the Markdown renderer, the maths
 and chemistry typesetting, the syntax highlighting and the diagram

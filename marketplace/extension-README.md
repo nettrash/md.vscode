@@ -160,6 +160,13 @@ YAML or TOML front matter at the very top of a file — `---` … `---` or
 from every export, instead of surfacing as a horizontal rule followed by
 stray text.
 
+An EPUB reads it as the book's metadata: `title`, `author`, `language`
+(a tag such as `en` or `pt-BR`), `date` (`2026-10-10`), `description`,
+and `series` with `series_index` reach the reader's library, and `cover`
+names the cover image — a file beside the document, an `https:` image or
+a `data:` image, in PNG, JPEG, GIF or WebP. A cover that cannot be read
+is left out and the book is written without one.
+
 ### Footnotes
 
 Write `[^id]` in the text and `[^id]: the note` on a line of its own. The
@@ -346,7 +353,8 @@ extension. md has no account, no telemetry and no servers of ours to send
 anything to. It reads the document you are previewing and writes only the
 file you name when you ask for an export. The single thing that can reach
 the network is an image **your own document names** by URL, which the
-preview fetches so it can show it, exactly as a browser would. Visual
+preview fetches so it can show it, exactly as a browser would — or that
+an EPUB's front matter names as its `cover:`. Visual
 Studio Code's own telemetry is the editor's, governed by your
 `telemetry.telemetryLevel` and by Microsoft's privacy statement. This
 extension adds nothing to it and reads nothing from it. The full policy is
