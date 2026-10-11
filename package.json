@@ -211,13 +211,14 @@
         },
         {
           "command": "md.exportLatex",
-          "group": "md@4"
+          "group": "md@4",
+          "when": "resourceLangId == markdown"
         }
       ],
       "explorer/context": [
         {
           "submenu": "md.export",
-          "when": "resourceLangId == markdown",
+          "when": "resourceLangId == markdown || resourceLangId == plantuml || resourceLangId == graphviz",
           "group": "md@1"
         },
         {
@@ -234,7 +235,7 @@
       "editor/context": [
         {
           "submenu": "md.export",
-          "when": "editorLangId == markdown",
+          "when": "editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz",
           "group": "md@1"
         },
         {
@@ -251,7 +252,7 @@
       "editor/title/context": [
         {
           "submenu": "md.export",
-          "when": "resourceLangId == markdown",
+          "when": "resourceLangId == markdown || resourceLangId == plantuml || resourceLangId == graphviz",
           "group": "md@1"
         },
         {
@@ -268,15 +269,15 @@
       "commandPalette": [
         {
           "command": "md.exportHtml",
-          "when": "editorLangId == markdown"
+          "when": "editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz"
         },
         {
           "command": "md.exportPdf",
-          "when": "editorLangId == markdown"
+          "when": "editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz"
         },
         {
           "command": "md.exportEpub",
-          "when": "editorLangId == markdown"
+          "when": "editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz"
         },
         {
           "command": "md.exportLatex",

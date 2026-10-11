@@ -46,6 +46,12 @@ it.
   not offered — and every private author note (`<!-- note: … -->`) with
   its line. The editor follows the highlighted row and Escape puts it back,
   as in Go to Symbol. Nothing in VS Code listed the notes before. (#3)
+- **A PlantUML or Graphviz file exports as PDF, HTML and EPUB.** The Export
+  submenu, the palette and a multi-file batch now take a bare `.puml` or
+  `.gv` file as well as Markdown, and draw it as the one diagram it is.
+  LaTeX stays Markdown-only, in a menu and in a batch. A diagram file's
+  EPUB lists the whole document as its one contents entry — a DOT `#` line
+  inside the graph is no longer mistaken for a heading. (#4)
 
 ## [1.5.3] — 2026-10-09
 

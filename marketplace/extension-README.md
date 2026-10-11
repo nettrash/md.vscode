@@ -276,9 +276,9 @@ the context menus below.
 
 | Command | What it does | Offered when |
 | --- | --- | --- |
-| **md: Export as HTML…** | One self-contained `.html` file, engines and fonts included | a Markdown editor is active, or Markdown files are selected — in batch too |
-| **md: Export as PDF…** | The rendered document as a PDF, at the size in `md.export.pageSize` | a Markdown editor is active, or one Markdown file is selected |
-| **md: Export as EPUB…** | An e-book with the document's headings as its contents | a Markdown editor is active, or Markdown files are selected — in batch too |
+| **md: Export as HTML…** | One self-contained `.html` file, engines and fonts included | a Markdown, PlantUML or Graphviz editor is active, or such files are selected — in batch too |
+| **md: Export as PDF…** | The rendered document as a PDF, at the size in `md.export.pageSize` | a Markdown, PlantUML or Graphviz editor is active, or one such file is selected |
+| **md: Export as EPUB…** | An e-book with the document's headings as its contents | a Markdown, PlantUML or Graphviz editor is active, or such files are selected — in batch too |
 | **md: Export as LaTeX…** | `.tex` source, mathematics kept as mathematics | a Markdown editor is active, or Markdown files are selected — in batch too |
 | **md: Export Diagram as SVG…** | One Mermaid, Graphviz or PlantUML diagram, or one chart, as a vector file | a Markdown, PlantUML or Graphviz editor is active, or one diagram file is selected |
 | **md: Preview Diagram** | Opens the diagram panel beside a diagram file | a PlantUML or Graphviz editor is active, or one diagram file is selected |

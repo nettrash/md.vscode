@@ -141,6 +141,12 @@ interface BatchFormat {
   /** Named in the progress notification and the summary. */
   readonly label: string;
   readonly bytes: (document: vscode.TextDocument) => Promise<Uint8Array> | Uint8Array;
+  /**
+   * The languages a batch takes, by VS Code language id. HTML and EPUB draw a
+   * bare PlantUML or Graphviz file as its diagram; LaTeX has nothing to say
+   * about one, so it keeps to Markdown.
+   */
+  readonly languages: readonly string[];
 }
 
 interface CommandSpec {
@@ -164,20 +170,20 @@ const COMMANDS: readonly CommandSpec[] = [
     id: 'md.exportHtml',
     title: 'Export as HTML',
     run: exportHtml,
-    batch: { extension: 'html', label: 'HTML', bytes: (document) => htmlBytes(document, true) },
+    batch: { extension: 'html', label: 'HTML', bytes: (document) => htmlBytes(document, true), languages: SUPPORTED_LANGUAGES },
   },
   { id: 'md.exportPdf', title: 'Export as PDF', run: exportPdf },
   {
     id: 'md.exportEpub',
     title: 'Export as EPUB',
     run: exportEpub,
-    batch: { extension: 'epub', label: 'EPUB', bytes: (document) => epubBytes(document, true) },
+    batch: { extension: 'epub', label: 'EPUB', bytes: (document) => epubBytes(document, true), languages: SUPPORTED_LANGUAGES },
   },
   {
     id: 'md.exportLatex',
     title: 'Export as LaTeX',
     run: exportLatex,
-    batch: { extension: 'tex', label: 'LaTeX', bytes: latexBytes },
+    batch: { extension: 'tex', label: 'LaTeX', bytes: latexBytes, languages: ['markdown'] },
   },
   { id: 'md.exportSvg', title: 'Export Diagram as SVG', run: exportSvg },
   { id: 'md.showDiagramPreview', title: 'Preview Diagram', run: showDiagramPreview },
@@ -280,6 +286,7 @@ async function guarded(id: string, work: () => Promise<void>): Promise<void> {
  */
 export async function batchTargets(
   uris: readonly vscode.Uri[],
+  languages: readonly string[] = ['markdown'],
 ): Promise<{ targets: vscode.Uri[]; skipped: number }> {
   const targets: vscode.Uri[] = [];
   let skipped = 0;
@@ -290,7 +297,7 @@ export async function batchTargets(
     }
     try {
       const document = await vscode.workspace.openTextDocument(uri);
-      if (document.languageId === 'markdown') targets.push(uri);
+      if (languages.includes(document.languageId)) targets.push(uri);
       else skipped++;
     } catch {
       skipped++;
@@ -316,9 +323,13 @@ async function runBatch(
   format: BatchFormat,
   uris: readonly vscode.Uri[],
 ): Promise<void> {
-  const { targets, skipped } = await batchTargets(uris);
+  const { targets, skipped } = await batchTargets(uris, format.languages);
   if (targets.length === 0) {
-    void vscode.window.showWarningMessage('md: no Markdown files in that selection.');
+    void vscode.window.showWarningMessage(
+      format.languages.length > 1
+        ? 'md: nothing in that selection is a Markdown, PlantUML or Graphviz file.'
+        : 'md: no Markdown files in that selection.',
+    );
     return;
   }
 
