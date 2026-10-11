@@ -106,9 +106,10 @@ import * as vscode from 'vscode';
 import { richRoot } from '../engines/paths';
 import { instrument, makeNonce } from '../export/renderHost';
 import type { EngineNeeds } from '../render/html';
-import { renderBody, isRawGraphviz, isRawPlantUML } from '../render/html';
+import { rawDiagramKind, renderBody, isRawPlantUML } from '../render/html';
 import { paintsOwnLightFills } from '../render/plantuml-palette';
 import { NATURAL_WIDTH_JS, NEXT_ZOOM_JS, ZOOM_LEVELS } from '../render/zoom';
+import { MERMAID_LANGUAGE, renderableSource } from '../render/mermaid-file';
 import { escapeHTML } from '../render/inline';
 import { isDarkTheme } from './config';
 
@@ -223,7 +224,7 @@ export function disposeDiagramPreviews(): void {
 // MARK: - One panel
 
 /** Which container the file produced, and therefore which engine will draw it. */
-type DiagramKind = 'plantuml' | 'graphviz' | null;
+type DiagramKind = 'plantuml' | 'graphviz' | 'mermaid' | null;
 
 class DiagramPreview {
   private readonly panel: vscode.WebviewPanel;
@@ -375,15 +376,17 @@ class DiagramPreview {
     }
     this.dirty = false;
 
-    const source = this.source();
-    const kind = diagramKind(source);
+    const languageId = this.languageId();
+    // A Mermaid file is drawn as the one fence it is (see mermaid-file.ts).
+    const source = renderableSource(this.source(), languageId);
+    const kind = diagramKind(source, languageId);
     const name = path.basename(this.document.uri.path) || 'Untitled';
     // The light/dark flag is the workbench's own, exactly as the built-in
     // preview's is. It no longer chooses a palette — the CSS reads the theme
     // live — but it still reaches the engines through `data-md-dark`, and it is
     // part of the fingerprint below for precisely that reason: the same file in
     // the other polarity is a different page and must be rebuilt.
-    const rendered = diagramDocument(source, name, isDarkTheme());
+    const rendered = diagramDocument(source, name, isDarkTheme(), languageId);
     if (rendered === this.lastDocument) return;
     this.lastDocument = rendered;
 
@@ -394,6 +397,12 @@ class DiagramPreview {
       this.rendering = false;
       if (this.dirty && !this.disposed) this.render();
     });
+  }
+
+  /** The file's language now — the same live-document rule as {@link source}. */
+  private languageId(): string {
+    const live = vscode.workspace.textDocuments.find((d) => d.uri.toString() === this.key);
+    return (live ?? this.document).languageId;
   }
 
   /**
@@ -491,12 +500,13 @@ class DiagramPreview {
  * stable for a file that has not changed: nothing here is randomised, and the
  * nonce is added afterwards by {@link DiagramPreview.page}.
  */
-function diagramDocument(source: string, title: string, dark: boolean): string {
+function diagramDocument(source: string, title: string, dark: boolean, languageId?: string): string {
   // No `engines` hooks and no `sourceLines`. The host-side engines are for the
   // built-in preview, which cannot run WebAssembly; this page can, so every
   // engine runs in it exactly as it does in the apps. `sourceLines` is scroll
   // sync, which belongs to a preview that has an editor to sync with.
-  const { html, needs } = renderBody(source, { title, dark });
+  const diagram = rawDiagramKind(source, languageId) ?? undefined;
+  const { html, needs } = renderBody(source, { title, dark, diagram });
   // A PlantUML file that paints its own light fills is drawn light, on a light
   // card, even in a dark theme: the engine's dark palette writes every label in
   // white, which cannot be read on the author's pastels (`paintsOwnLightFills`).
@@ -579,14 +589,19 @@ function panelTitle(document: vscode.TextDocument): string {
  * Which container `renderBody` will emit for this text — asked here so the
  * status line can name the right engine before the page has drawn anything.
  *
- * Deliberately the same two predicates `renderBody` itself consults, in the
- * same order, rather than a look at the file extension: an `.iuml` include
- * fragment has no `@start…` line and really is not a diagram, and a `.txt` file
- * that opens `digraph {` really is one.
+ * Deliberately the rule `renderBody` itself follows (`rawDiagramKind`) rather
+ * than a look at the file extension: an `.iuml` include fragment has no
+ * `@start…` line and really is not a diagram, and a `.txt` file that opens
+ * `digraph {` really is one. Graphviz is the exception, decided by its language
+ * as well, because DOT opening with a `#` line has no marker to be read by.
  */
-function diagramKind(source: string): DiagramKind {
-  if (isRawPlantUML(source)) return 'plantuml';
-  if (isRawGraphviz(source)) return 'graphviz';
+function diagramKind(source: string, languageId: string): DiagramKind {
+  // A Mermaid file is known by its language id alone (see mermaid-file.ts).
+  if (languageId === MERMAID_LANGUAGE) return 'mermaid';
+  // A Graphviz file by its language too, as the exports do: DOT that opens with
+  // a `#` preprocessor line has nothing else to be recognised by.
+  const raw = rawDiagramKind(source, languageId);
+  if (raw !== null) return raw;
   return null;
 }
 
@@ -620,9 +635,13 @@ function statusBar(kind: DiagramKind): string {
     );
   }
 
-  const engine = kind === 'plantuml' ? 'PlantUML' : 'Graphviz';
+  const engine = kind === 'plantuml' ? 'PlantUML' : kind === 'mermaid' ? 'Mermaid' : 'Graphviz';
   const pending =
-    kind === 'plantuml' ? 'Drawing with PlantUML…' : 'Laying the graph out with Graphviz…';
+    kind === 'plantuml'
+      ? 'Drawing with PlantUML…'
+      : kind === 'mermaid'
+        ? 'Drawing with Mermaid…'
+        : 'Laying the graph out with Graphviz…';
   const failed = `${engine} could not draw this file. Its source is shown above, unchanged.`;
   return (
     `<div class="md-diagram-status" data-md-host="1" data-state="pending"` +
@@ -819,7 +838,8 @@ img,
    Only when the file really did produce one diagram container. A file that fell
    through to the Markdown path keeps the ordinary page above, padding and all. */
 body[data-md-diagram="plantuml"],
-body[data-md-diagram="graphviz"] {
+body[data-md-diagram="graphviz"],
+body[data-md-diagram="mermaid"] {
     margin: 0;
     padding: 0;
     min-height: 100vh;
@@ -836,7 +856,8 @@ body[data-md-diagram="graphviz"] {
    that is defensible for a figure in the middle of a document, and no use at
    all when the whole panel is that one block. */
 body[data-md-diagram] > div.plantuml,
-body[data-md-diagram] > div.graphviz {
+body[data-md-diagram] > div.graphviz,
+body[data-md-diagram] > pre.mermaid {
     flex: 1 1 auto;
     /* Without this a flex item refuses to shrink below its content, and the
        scrolling would happen on the page instead of inside the stage. */
@@ -854,7 +875,8 @@ body[data-md-diagram] > div.graphviz {
 }
 /* Drawn: a figure, centred in whatever room there is. */
 body[data-md-diagram-state="drawn"] > div.plantuml,
-body[data-md-diagram-state="drawn"] > div.graphviz {
+body[data-md-diagram-state="drawn"] > div.graphviz,
+body[data-md-diagram-state="drawn"] > pre.mermaid {
     display: flex;
 }
 /* A PlantUML file drawn in the light palette in a dark theme (see
@@ -868,7 +890,8 @@ body[data-md-palette="light"] > div.plantuml > svg {
     box-sizing: border-box;
 }
 body[data-md-diagram-state="drawn"] > div.plantuml > svg,
-body[data-md-diagram-state="drawn"] > div.graphviz > svg {
+body[data-md-diagram-state="drawn"] > div.graphviz > svg,
+body[data-md-diagram-state="drawn"] > pre.mermaid > svg {
     /* Centred by auto margins rather than by align-items / justify-content. A
        flex item centred by alignment overflows its scroll container in BOTH
        directions, and the top and left of an oversized diagram then cannot be
@@ -949,7 +972,7 @@ body[data-md-diagram="none"] .md-diagram-status {
  */
 export const CHROME_CLIENT = `(function () {
   var body = document.body;
-  var stage = document.querySelector('body > div.plantuml, body > div.graphviz');
+  var stage = document.querySelector('body > div.plantuml, body > div.graphviz, body > pre.mermaid');
   var status = document.querySelector('.md-diagram-status');
 
   if (!stage) {
@@ -959,7 +982,7 @@ export const CHROME_CLIENT = `(function () {
     return;
   }
   body.setAttribute('data-md-diagram',
-    stage.classList.contains('plantuml') ? 'plantuml' : 'graphviz');
+    stage.classList.contains('plantuml') ? 'plantuml' : stage.classList.contains('mermaid') ? 'mermaid' : 'graphviz');
   body.setAttribute('data-md-diagram-state', 'pending');
 
   // ── Zoom. Fit (null) is how the diagram arrives: no wider than the panel. A
