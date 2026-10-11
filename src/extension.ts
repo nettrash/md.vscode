@@ -43,6 +43,7 @@ import { disposeDialectLint, registerDialectLint } from './lint/diagnostics';
 import { richDirectory } from './preview/assets';
 import { affectsPreview, readConfig } from './preview/config';
 import { disposeDiagramPreviews, registerDiagramPreviews } from './preview/diagramPreview';
+import { registerWordCount } from './status/wordCount';
 import { extendMarkdownIt } from './preview/markdownItHook';
 
 /** The public API object VS Code reads after activating us. */
@@ -70,6 +71,9 @@ export function activate(context: vscode.ExtensionContext): MdApi {
   // thing VS Code cannot dispose for us is a debounce timer still counting
   // down, hence `disposeDialectLint` in `deactivate` below.
   registerDialectLint(context);
+
+  // The word and character count in the status bar — the apps' footer.
+  registerWordCount(context);
 
   context.subscriptions.push(
     // The palette, the two font stacks and `data-md-dark` are baked into the
