@@ -43,6 +43,7 @@ import { disposeDialectLint, registerDialectLint } from './lint/diagnostics';
 import { richDirectory } from './preview/assets';
 import { affectsPreview, readConfig } from './preview/config';
 import { disposeDiagramPreviews, registerDiagramPreviews } from './preview/diagramPreview';
+import { registerGoTo } from './navigate/goTo';
 import { registerWordCount } from './status/wordCount';
 import { extendMarkdownIt } from './preview/markdownItHook';
 
@@ -74,6 +75,9 @@ export function activate(context: vscode.ExtensionContext): MdApi {
 
   // The word and character count in the status bar — the apps' footer.
   registerWordCount(context);
+
+  // Go to Heading… and Go to Note… — the apps' Contents and Notes menus.
+  registerGoTo(context);
 
   context.subscriptions.push(
     // The palette, the two font stacks and `data-md-dark` are baked into the
