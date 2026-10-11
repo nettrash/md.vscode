@@ -337,6 +337,8 @@ describe('contributes.menus — where the commands are offered', () => {
         command: 'md.showDiagramPreview',
         when: 'editorLangId == plantuml || editorLangId == graphviz',
       },
+      { command: 'md.goToHeading', when: 'editorLangId == markdown' },
+      { command: 'md.goToNote', when: 'editorLangId == markdown' },
       { command: 'md.zoomIn', when: PANEL },
       { command: 'md.zoomOut', when: PANEL },
       { command: 'md.zoomReset', when: PANEL },

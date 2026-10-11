@@ -160,6 +160,16 @@
         "category": "md"
       },
       {
+        "command": "md.goToHeading",
+        "title": "Go to Heading…",
+        "category": "md"
+      },
+      {
+        "command": "md.goToNote",
+        "title": "Go to Note…",
+        "category": "md"
+      },
+      {
         "command": "md.zoomIn",
         "title": "Zoom In",
         "category": "md",
@@ -279,6 +289,14 @@
         {
           "command": "md.showDiagramPreview",
           "when": "editorLangId == plantuml || editorLangId == graphviz"
+        },
+        {
+          "command": "md.goToHeading",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "md.goToNote",
+          "when": "editorLangId == markdown"
         },
         {
           "command": "md.zoomIn",

@@ -282,6 +282,7 @@ the context menus below.
 | **md: Export as LaTeX…** | `.tex` source, mathematics kept as mathematics | a Markdown editor is active, or Markdown files are selected — in batch too |
 | **md: Export Diagram as SVG…** | One Mermaid, Graphviz or PlantUML diagram, or one chart, as a vector file | a Markdown, PlantUML or Graphviz editor is active, or one diagram file is selected |
 | **md: Preview Diagram** | Opens the diagram panel beside a diagram file | a PlantUML or Graphviz editor is active, or one diagram file is selected |
+| **md: Go to Heading…** / **Go to Note…** | Jump to a heading, or to one of the document's private notes, from a list that follows as you move through it | a Markdown editor is active |
 | **md: Zoom In** / **Zoom Out** / **Reset Zoom** | Zoom the diagram in the diagram panel; Reset fits it to the panel again (Ctrl / ⌘ +, −, 0) | the diagram panel is the active editor |
 
 Mathematics is not on the SVG list, because KaTeX sets a formula as HTML
