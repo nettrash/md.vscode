@@ -162,6 +162,16 @@
         "category": "md"
       },
       {
+        "command": "md.exportTextBundle",
+        "title": "Export as TextBundle…",
+        "category": "md"
+      },
+      {
+        "command": "md.exportTextPack",
+        "title": "Export as TextPack…",
+        "category": "md"
+      },
+      {
         "command": "md.exportSvg",
         "title": "Export Diagram as SVG…",
         "category": "md"
@@ -224,6 +234,16 @@
         {
           "command": "md.exportLatex",
           "group": "md@4",
+          "when": "resourceLangId == markdown"
+        },
+        {
+          "command": "md.exportTextBundle",
+          "group": "md@5",
+          "when": "resourceLangId == markdown && !listMultiSelection"
+        },
+        {
+          "command": "md.exportTextPack",
+          "group": "md@6",
           "when": "resourceLangId == markdown"
         }
       ],
@@ -293,6 +313,14 @@
         },
         {
           "command": "md.exportLatex",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "md.exportTextBundle",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "md.exportTextPack",
           "when": "editorLangId == markdown"
         },
         {

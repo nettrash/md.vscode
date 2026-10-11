@@ -256,20 +256,27 @@ describe('contributes.submenus — the export submenu', () => {
     expect(submenus[0].label.length).toBeGreaterThan(0);
   });
 
-  it('offers the four document exports, in the order the family lists them', () => {
+  it('offers the six document exports, in the order the family lists them', () => {
     expect(commandIds('md.export')).toEqual([
       'md.exportHtml',
       'md.exportPdf',
       'md.exportEpub',
       'md.exportLatex',
+      'md.exportTextBundle',
+      'md.exportTextPack',
     ]);
   });
 
-  it('keeps PDF out of a multi-selection and LaTeX to Markdown, and nothing else', () => {
+  it('keeps PDF and TextBundle out of a multi-selection and the text formats to Markdown, and nothing else', () => {
     expect(row('md.export', 'md.exportPdf').when).toBe('!listMultiSelection');
     // From 1.6.0 the submenu also opens on a PlantUML or Graphviz file, which
-    // LaTeX has nothing to say about (#4).
+    // LaTeX has nothing to say about (#4); nor have TextBundle and TextPack,
+    // which carry a Markdown text (#6).
     expect(row('md.export', 'md.exportLatex').when).toBe('resourceLangId == markdown');
+    expect(row('md.export', 'md.exportTextPack').when).toBe('resourceLangId == markdown');
+    // A TextBundle is a folder picked per document; many documents go as
+    // TextPacks, one file each, through the batch.
+    expect(row('md.export', 'md.exportTextBundle').when).toBe('resourceLangId == markdown && !listMultiSelection');
     for (const id of ['md.exportHtml', 'md.exportEpub']) {
       expect(row('md.export', id).when, id).toBeUndefined();
     }
@@ -343,6 +350,8 @@ describe('contributes.menus — where the commands are offered', () => {
       { command: 'md.exportPdf', when: EDITOR_DOCUMENTS },
       { command: 'md.exportEpub', when: EDITOR_DOCUMENTS },
       { command: 'md.exportLatex', when: 'editorLangId == markdown' },
+      { command: 'md.exportTextBundle', when: 'editorLangId == markdown' },
+      { command: 'md.exportTextPack', when: 'editorLangId == markdown' },
       {
         command: 'md.exportSvg',
         when: 'editorLangId == markdown || editorLangId == plantuml || editorLangId == graphviz || editorLangId == mermaid',
