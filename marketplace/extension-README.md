@@ -205,9 +205,9 @@ extension, never guessed from its text.
 Markdown files stay VS Code's own. The built-in `markdown` language opens
 `.md`, `.markdown`, `.mdown`, `.markdn`, `.mdtext`, `.mdtxt`, `.mkd` and
 `.mdwn`; md adds `.mkdn` and `.mkdown` to that same language rather than to
-one of its own, so every spelling the iPhone, iPad, Mac, Windows and Android
-apps open opens here too — in the preview you already use, with the same
-commands, and with nothing about how a `.md` file behaves changed.
+one of its own, so every spelling the iPhone, iPad, Mac, Windows, Linux and
+Android apps open opens here too — in the preview you already use, with the
+same commands, and with nothing about how a `.md` file behaves changed.
 
 ### Exports
 
@@ -391,9 +391,9 @@ Said plainly, because each one is a decision rather than an oversight.
 - **An author note is hidden only on a line of its own.** Written inline,
   it renders.
 - **View modes belong to VS Code, not to md.** The iPhone, iPad, Mac,
-  Windows and Android apps remember whether each file was last open in
-  the editor, the preview or a split, because they own their whole
-  window. Here the editor owns it: *Open Preview* and *Open Preview to
+  Windows, Linux and Android apps remember whether each file was last
+  open in the editor, the preview or a split, because they own their
+  whole window. Here the editor owns it: *Open Preview* and *Open Preview to
   the Side* place the preview, **View: Toggle Editor Group Layout**
   rearranges the columns, and VS Code restores your groups and tabs
   itself. md keeps no memory of its own, adds no setting for one and
@@ -406,7 +406,7 @@ Every release is listed in the **Changelog** tab of this page, and in
 
 ## The rest of the family
 
-md is also a native app on four other platforms, sharing this renderer —
+md is also a native app on five other platforms, sharing this renderer —
 the same mathematics, diagrams and charts — and these export formats.
 
 ### md for Windows
@@ -422,6 +422,23 @@ chapters into one book. It opens every spelling of Markdown this extension
 does, saves in place as you write, and has no accounts, no analytics and
 no tracking. The source is at
 [github.com/nettrash/md.win](https://github.com/nettrash/md.win).
+
+### md for Linux
+
+A Markdown editor and live previewer for Linux — a native GTK 4 and
+libadwaita app, the Linux edition of md for Mac — on x86-64 and ARM64: a
+`.deb` for Ubuntu 26.04 LTS, an `.rpm` for Fedora 44 and later, and a
+portable `.tar.gz` for other distributions, all from
+[nettrash.me](https://nettrash.me/linux/md/support.html#download). Write
+on one side and watch the finished page take shape on the other, in Edit,
+Split and Preview layouts, with a Zen mode that gives your text the whole
+screen. The page is this extension's page — LaTeX and chemistry, Mermaid,
+Graphviz and PlantUML, plots — drawn offline on your computer. Print it,
+export it as PDF, HTML, EPUB, LaTeX or a TextBundle, or compile a folder of
+chapters into one book. It opens every spelling of Markdown this extension
+does, saves in place as you write, and has no accounts, no analytics and
+no tracking. Installing and support are at
+[nettrash.me/linux/md](https://nettrash.me/linux/md/support.html).
 
 ### iPhone, iPad, Mac and Android
 

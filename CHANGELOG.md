@@ -9,8 +9,9 @@ iOS and macOS, no Gradle `versionCode` finalizer as on Android — and the
 Marketplace requires a three-part version, so the family's two-part `1.5`
 is published as `1.5.0`. A republish that changes no behaviour is not
 tracked here, which is why `1.2.1` — a relisting that corrected the
-Marketplace description and replaced the screenshots — has no section of
-its own.
+Marketplace description and replaced the screenshots — and `1.6.1`, which
+added md for Linux to the listing's family section, have no section of
+their own.
 
 This extension began at its own 1.0 rather than as a continuation of the
 apps' 1.3 line, and this file has said since that release that it would

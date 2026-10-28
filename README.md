@@ -16,11 +16,12 @@ code).
 > This is the VS Code port of [**md**](https://github.com/nettrash/md),
 > the iPhone / iPad editor, and of its native
 > [macOS](https://github.com/nettrash/md.macOS),
-> [Windows](https://github.com/nettrash/md.win) and
-> [Android](https://github.com/nettrash/md.Android) siblings. All five
+> [Windows](https://github.com/nettrash/md.win),
+> [Linux](https://nettrash.me/linux/md/support.html) and
+> [Android](https://github.com/nettrash/md.Android) siblings. All six
 > share the same hand-written block parser, renderer and themed HTML
 > export; this port reimplements them in TypeScript. The difference worth
-> knowing is that the other four own their whole preview window and this
+> knowing is that the other five own their whole preview window and this
 > one is a guest in VS Code's: so the byte-for-byte parity contract lives
 > in the **export** path, which md.vscode writes end to end, while the
 > preview aims at looking the same rather than at being the same bytes.
@@ -256,8 +257,8 @@ code).
   extension host and read their files from disk, which the browser
   extension host cannot do — so there is no `vscode.dev` build rather
   than a `vscode.dev` build that silently renders half a document.
-- **No view-mode memory, on purpose.** The iPhone, iPad, Mac, Windows
-  and Android apps remember whether each file was last open in the
+- **No view-mode memory, on purpose.** The iPhone, iPad, Mac, Windows,
+  Linux and Android apps remember whether each file was last open in the
   editor, the preview or a split, because those apps own their whole
   window and something there has to decide. Here VS Code decides, and
   has since before this extension existed: *Open Preview*

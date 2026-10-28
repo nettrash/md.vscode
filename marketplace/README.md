@@ -80,12 +80,12 @@ must be corrected in the same commit that replaces them — a caption
 promising a chart over a picture without one is the failure mode this
 paragraph exists to prevent.
 
-| Source | Marketplace field | Limit | Current (1.6.0) |
+| Source | Marketplace field | Limit | Current (1.6.1) |
 | --- | --- | --- | --- |
 | `package.json` `publisher` + `name` | Unique identifier | lowercase, no spaces | `nettrash.md-vscode` |
 | `package.json` `displayName` | Extension name | not published | `md` (2) |
 | `package.json` `description` | One-line description under the name | not published | 203 |
-| `package.json` `version` | Version | must be `major.minor.patch` | `1.6.0` |
+| `package.json` `version` | Version | must be `major.minor.patch` | `1.6.1` |
 | `package.json` `categories` | Categories | fixed vocabulary | 3 |
 | `package.json` `keywords` | Tags, used by search | not published | 14 |
 | `package.json` `galleryBanner` | Banner behind the name | — | `#2B221C`, dark |
