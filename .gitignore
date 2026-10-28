@@ -93,3 +93,6 @@ media/preview/md-preview.js.map
 # Claude Code
 .claude/
 CLAUDE.md
+
+# Publish
+publish.md
